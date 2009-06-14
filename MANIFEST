@@ -1,0 +1,17 @@
+Changes
+MANIFEST
+META.yml
+Makefile.PL
+README
+autovivification.xs
+lib/autovivification.pm
+ptable.h
+samples/hash2array.pl
+t/00-load.t
+t/20-hash.t
+t/21-array.t
+t/30-scope.t
+t/91-pod.t
+t/92-pod-coverage.t
+t/95-portability-files.t
+t/99-kwalitee.t

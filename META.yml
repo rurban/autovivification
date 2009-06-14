@@ -1,0 +1,29 @@
+--- #YAML:1.0
+name:               autovivification
+version:            0.01
+abstract:           ~
+author:
+    - Vincent Pit <perl@profvince.com>
+license:            perl
+distribution_type:  module
+configure_requires:
+    ExtUtils::MakeMaker:  0
+build_requires:
+    ExtUtils::MakeMaker:  0
+    Test::More:           0
+requires:
+    perl:      5.008
+    XSLoader:  0
+resources:
+    bugtracker:  http://rt.cpan.org/NoAuth/ReportBug.html?Queue=autovivification
+    homepage:    http://search.cpan.org/dist/autovivification/
+    license:     http://dev.perl.org/licenses/
+    repository:  http://git.profvince.com/?p=perl%2Fmodules%2Fautovivification.git
+no_index:
+    directory:
+        - t
+        - inc
+generated_by:       ExtUtils::MakeMaker version 6.52
+meta-spec:
+    url:      http://module-build.sourceforge.net/META-spec-v1.4.html
+    version:  1.4

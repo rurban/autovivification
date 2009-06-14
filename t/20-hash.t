@@ -1,0 +1,359 @@
+#!perl -T
+
+use strict;
+use warnings;
+
+use Test::More tests => 6 * 3 * 240;
+
+sub testcase {
+ my ($var, $init, $code, $exp, $use, $global) = @_;
+ my $decl = $global ? "our $var; local $var;" : "my $var;";
+ my $test = $var =~ /^[@%]/ ? "\\$var" : $var;
+ return <<TESTCASE;
+my \@exp = ($exp);
+$decl
+$init
+my \$res = eval {
+ local \$SIG{__WARN__} = sub { die join '', 'warn:', \@_ };
+ $use
+ $code
+};
+if (ref \$exp[0]) {
+ like \$@, \$exp[0], \$desc . ' [exception]';
+} else {
+ is   \$@, \$exp[0], \$desc . ' [exception]';
+}
+is_deeply \$res, \$exp[1], \$desc . ' [return]';
+is_deeply $test, \$exp[2], \$desc . ' [variable]';
+TESTCASE
+}
+
+while (<DATA>) {
+ 1 while chomp;
+ next unless /#/;
+ my @chunks = split /#+/, "$_ ";
+ s/^\s+//, s/\s+$// for @chunks;
+ my ($init, $code, $exp, $opts) = @chunks;
+ (my $var = $init) =~ s/[^\$@%\w].*//;
+ $init = $var eq $init ? '' : "$init;";
+ my $use;
+ if ($opts) {
+  for (split ' ', $opts) {
+   my $no = 1;
+   $no = 0 if s/^([-+])// and $1 eq '-';
+   $use .= ($no ? 'no' : 'use') . " autovivification '$_';"
+  }
+ } elsif (defined $opts) {
+  $opts = 'empty';
+  $use  = 'no autovivification;';
+ } else {
+  $opts = 'default';
+  $use  = '';
+ }
+ my @testcases = (
+  [ $var, $init,               $code, $exp, $use, 0 ],
+  [ $var, "use strict; $init", $code, $exp, $use, 1 ],
+  [ $var, "no strict;  $init", $code, $exp, $use, 1 ],
+ );
+ my @extra;
+ for (@testcases) {
+  my $var = $_->[0];
+  if ($var =~ /\$/) {
+   my @new = @$_;
+   $new[0] =~ s/^$/%/;
+   $new[1] =~ s/$var\->/$var/g;
+   $new[2] =~ s/$var\->/$var/g;
+   push @extra, \@new;
+  }
+ }
+ push @testcases, @extra;
+ for (@testcases) {
+  my $testcase = testcase(@$_);
+  my ($var, $init, $code) = @$_;
+  my $desc = do { (my $x = "$var | $init") =~ s,;\s+$,,; $x } . " | $code | $opts";
+  eval $testcase;
+  diag "== This testcase failed to compile ==\n$testcase\n## Reason: $@" if $@;
+ }
+}
+
+__DATA__
+
+--- fetch ---
+
+$x # $x->{a} # '', undef, { } 
+$x # $x->{a} # '', undef, undef #
+$x # $x->{a} # '', undef, undef # +fetch
+$x # $x->{a} # '', undef, { }   # +exists
+$x # $x->{a} # '', undef, { }   # +delete
+$x # $x->{a} # '', undef, { }   # +store
+
+$x # $x->{a} # qr/^Reference vivification forbidden/, undef, undef # +strict +fetch
+$x # $x->{a} # '', undef, { } # +strict +exists
+$x # $x->{a} # '', undef, { } # +strict +delete
+$x # $x->{a} # '', undef, { } # +strict +store
+
+$x # $x->{a}->{b} # '', undef, { a => { } }
+$x # $x->{a}->{b} # '', undef, undef        #
+$x # $x->{a}->{b} # '', undef, undef        # +fetch
+$x # $x->{a}->{b} # '', undef, { a => { } } # +exists
+$x # $x->{a}->{b} # '', undef, { a => { } } # +delete
+$x # $x->{a}->{b} # '', undef, { a => { } } # +store
+
+$x # $x->{a}->{b} # qr/^Reference vivification forbidden/, undef, undef # +strict +fetch
+$x # $x->{a}->{b} # '', undef, { a => { } } # +strict +exists
+$x # $x->{a}->{b} # '', undef, { a => { } } # +strict +delete
+$x # $x->{a}->{b} # '', undef, { a => { } } # +strict +store
+
+$x->{a} = 1 # $x->{a} # '', 1,     { a => 1 } # +fetch
+$x->{a} = 1 # $x->{b} # '', undef, { a => 1 } # +fetch
+$x->{a} = 1 # $x->{a} # '', 1,     { a => 1 } # +exists
+$x->{a} = 1 # $x->{b} # '', undef, { a => 1 } # +exists
+$x->{a} = 1 # $x->{a} # '', 1,     { a => 1 } # +delete
+$x->{a} = 1 # $x->{b} # '', undef, { a => 1 } # +delete
+$x->{a} = 1 # $x->{a} # '', 1,     { a => 1 } # +store
+$x->{a} = 1 # $x->{b} # '', undef, { a => 1 } # +store
+
+$x->{a} = 1 # $x->{a} # '', 1,     { a => 1 } # +strict +fetch
+$x->{a} = 1 # $x->{b} # '', undef, { a => 1 } # +strict +fetch
+$x->{a} = 1 # $x->{a} # '', 1,     { a => 1 } # +strict +exists
+$x->{a} = 1 # $x->{b} # '', undef, { a => 1 } # +strict +exists
+$x->{a} = 1 # $x->{a} # '', 1,     { a => 1 } # +strict +delete
+$x->{a} = 1 # $x->{b} # '', undef, { a => 1 } # +strict +delete
+$x->{a} = 1 # $x->{a} # '', 1,     { a => 1 } # +strict +store
+$x->{a} = 1 # $x->{b} # '', undef, { a => 1 } # +strict +store
+
+$x->{a}->{b} = 1 # $x->{a}->{b} # '', 1,     { a => { b => 1 } } # +fetch
+$x->{a}->{b} = 1 # $x->{a}->{d} # '', undef, { a => { b => 1 } } # +fetch
+$x->{a}->{b} = 1 # $x->{c}->{d} # '', undef, { a => { b => 1 } } # +fetch
+$x->{a}->{b} = 1 # $x->{a}->{b} # '', 1,     { a => { b => 1 } } # +exists
+$x->{a}->{b} = 1 # $x->{a}->{d} # '', undef, { a => { b => 1 } } # +exists
+$x->{a}->{b} = 1 # $x->{c}->{d} # '', undef, { a => { b => 1 }, c => { } } # +exists
+$x->{a}->{b} = 1 # $x->{a}->{b} # '', 1,     { a => { b => 1 } } # +delete
+$x->{a}->{b} = 1 # $x->{a}->{d} # '', undef, { a => { b => 1 } } # +delete
+$x->{a}->{b} = 1 # $x->{c}->{d} # '', undef, { a => { b => 1 }, c => { } } # +delete
+$x->{a}->{b} = 1 # $x->{a}->{b} # '', 1,     { a => { b => 1 } } # +store
+$x->{a}->{b} = 1 # $x->{a}->{d} # '', undef, { a => { b => 1 } } # +store
+$x->{a}->{b} = 1 # $x->{c}->{d} # '', undef, { a => { b => 1 }, c => { } } # +store
+
+$x->{a}->{b} = 1 # $x->{a}->{b} # '', 1,     { a => { b => 1 } }                # +strict +fetch
+$x->{a}->{b} = 1 # $x->{a}->{d} # '', undef, { a => { b => 1 } }                # +strict +fetch
+$x->{a}->{b} = 1 # $x->{c}->{d} # qr/^Reference vivification forbidden/, undef, { a => { b => 1 } } # +strict +fetch
+$x->{a}->{b} = 1 # $x->{a}->{b} # '', 1,     { a => { b => 1 } }                # +strict +exists
+$x->{a}->{b} = 1 # $x->{a}->{d} # '', undef, { a => { b => 1 } }                # +strict +exists
+$x->{a}->{b} = 1 # $x->{c}->{d} # '', undef, { a => { b => 1 }, c => { } }      # +strict +exists
+$x->{a}->{b} = 1 # $x->{a}->{b} # '', 1,     { a => { b => 1 } }                # +strict +delete
+$x->{a}->{b} = 1 # $x->{a}->{d} # '', undef, { a => { b => 1 } }                # +strict +delete
+$x->{a}->{b} = 1 # $x->{c}->{d} # '', undef, { a => { b => 1 }, c => { } }      # +strict +delete
+$x->{a}->{b} = 1 # $x->{a}->{b} # '', 1,     { a => { b => 1 } }                # +strict +store
+$x->{a}->{b} = 1 # $x->{a}->{d} # '', undef, { a => { b => 1 } }                # +strict +store
+$x->{a}->{b} = 1 # $x->{c}->{d} # '', undef, { a => { b => 1 }, c => { } }      # +strict +store
+
+--- exists ---
+
+$x # exists $x->{a} # '', '', { }
+$x # exists $x->{a} # '', '', undef #
+$x # exists $x->{a} # '', '', { }   # +fetch
+$x # exists $x->{a} # '', '', undef # +exists
+$x # exists $x->{a} # '', '', { }   # +delete
+$x # exists $x->{a} # '', '', { }   # +store
+
+$x # exists $x->{a} # '', '', { } # +strict +fetch
+$x # exists $x->{a} # qr/^Reference vivification forbidden/, undef, undef # +strict +exists
+$x # exists $x->{a} # '', '', { } # +strict +delete
+$x # exists $x->{a} # '', '', { } # +strict +store
+
+$x # exists $x->{a}->{b} # '', '', { a => { } }
+$x # exists $x->{a}->{b} # '', '', undef        #
+$x # exists $x->{a}->{b} # '', '', { a => { } } # +fetch
+$x # exists $x->{a}->{b} # '', '', undef        # +exists
+$x # exists $x->{a}->{b} # '', '', { a => { } } # +delete
+$x # exists $x->{a}->{b} # '', '', { a => { } } # +store
+
+$x # exists $x->{a}->{b} # '', '', { a => { } } # +strict +fetch
+$x # exists $x->{a}->{b} # qr/^Reference vivification forbidden/, undef, undef # +strict +exists
+$x # exists $x->{a}->{b} # '', '', { a => { } } # +strict +delete
+$x # exists $x->{a}->{b} # '', '', { a => { } } # +strict +store
+
+$x->{a} = 1 # exists $x->{a} # '', 1,  { a => 1 } # +fetch
+$x->{a} = 1 # exists $x->{b} # '', '', { a => 1 } # +fetch
+$x->{a} = 1 # exists $x->{a} # '', 1,  { a => 1 } # +exists
+$x->{a} = 1 # exists $x->{b} # '', '', { a => 1 } # +exists
+$x->{a} = 1 # exists $x->{a} # '', 1,  { a => 1 } # +delete
+$x->{a} = 1 # exists $x->{b} # '', '', { a => 1 } # +delete
+$x->{a} = 1 # exists $x->{a} # '', 1,  { a => 1 } # +store
+$x->{a} = 1 # exists $x->{b} # '', '', { a => 1 } # +store
+
+$x->{a} = 1 # exists $x->{a} # '', 1,  { a => 1 } # +strict +fetch
+$x->{a} = 1 # exists $x->{b} # '', '', { a => 1 } # +strict +fetch
+$x->{a} = 1 # exists $x->{a} # '', 1,  { a => 1 } # +strict +exists
+$x->{a} = 1 # exists $x->{b} # '', '', { a => 1 } # +strict +exists
+$x->{a} = 1 # exists $x->{a} # '', 1,  { a => 1 } # +strict +delete
+$x->{a} = 1 # exists $x->{b} # '', '', { a => 1 } # +strict +delete
+$x->{a} = 1 # exists $x->{a} # '', 1,  { a => 1 } # +strict +store
+$x->{a} = 1 # exists $x->{b} # '', '', { a => 1 } # +strict +store
+
+$x->{a}->{b} = 1 # exists $x->{a}->{b} # '', 1,  { a => { b => 1 } } # +fetch
+$x->{a}->{b} = 1 # exists $x->{a}->{d} # '', '', { a => { b => 1 } } # +fetch
+$x->{a}->{b} = 1 # exists $x->{c}->{d} # '', '', { a => { b => 1 }, c => { } } # +fetch
+$x->{a}->{b} = 1 # exists $x->{a}->{b} # '', 1,  { a => { b => 1 } } # +exists
+$x->{a}->{b} = 1 # exists $x->{a}->{d} # '', '', { a => { b => 1 } } # +exists
+$x->{a}->{b} = 1 # exists $x->{c}->{d} # '', '', { a => { b => 1 } } # +exists
+$x->{a}->{b} = 1 # exists $x->{a}->{b} # '', 1,  { a => { b => 1 } } # +delete
+$x->{a}->{b} = 1 # exists $x->{a}->{d} # '', '', { a => { b => 1 } } # +delete
+$x->{a}->{b} = 1 # exists $x->{c}->{d} # '', '', { a => { b => 1 }, c => { } } # +delete
+$x->{a}->{b} = 1 # exists $x->{a}->{b} # '', 1,  { a => { b => 1 } } # +store
+$x->{a}->{b} = 1 # exists $x->{a}->{d} # '', '', { a => { b => 1 } } # +store
+$x->{a}->{b} = 1 # exists $x->{c}->{d} # '', '', { a => { b => 1 }, c => { } } # +store
+
+$x->{a}->{b} = 1 # exists $x->{a}->{b} # '', 1,  { a => { b => 1 } }            # +strict +fetch
+$x->{a}->{b} = 1 # exists $x->{a}->{d} # '', '', { a => { b => 1 } }            # +strict +fetch
+$x->{a}->{b} = 1 # exists $x->{c}->{d} # '', '', { a => { b => 1 }, c => { } }  # +strict +fetch
+$x->{a}->{b} = 1 # exists $x->{a}->{b} # '', 1,  { a => { b => 1 } }            # +strict +exists
+$x->{a}->{b} = 1 # exists $x->{a}->{d} # '', '', { a => { b => 1 } }            # +strict +exists
+$x->{a}->{b} = 1 # exists $x->{c}->{d} # qr/^Reference vivification forbidden/, undef, { a => { b => 1 } }  # +strict +exists
+$x->{a}->{b} = 1 # exists $x->{a}->{b} # '', 1,  { a => { b => 1 } }            # +strict +delete
+$x->{a}->{b} = 1 # exists $x->{a}->{d} # '', '', { a => { b => 1 } }            # +strict +delete
+$x->{a}->{b} = 1 # exists $x->{c}->{d} # '', '', { a => { b => 1 }, c => { } }  # +strict +delete
+$x->{a}->{b} = 1 # exists $x->{a}->{b} # '', 1,  { a => { b => 1 } }            # +strict +store
+$x->{a}->{b} = 1 # exists $x->{a}->{d} # '', '', { a => { b => 1 } }            # +strict +store
+$x->{a}->{b} = 1 # exists $x->{c}->{d} # '', '', { a => { b => 1 }, c => { } }  # +strict +store
+
+--- delete ---
+
+$x # delete $x->{a} # '', undef, { }
+$x # delete $x->{a} # '', undef, undef #
+$x # delete $x->{a} # '', undef, { }   # +fetch
+$x # delete $x->{a} # '', undef, { }   # +exists
+$x # delete $x->{a} # '', undef, undef # +delete
+$x # delete $x->{a} # '', undef, { }   # +store
+
+$x # delete $x->{a} # '', undef, { } # +strict +fetch
+$x # delete $x->{a} # '', undef, { } # +strict +exists
+$x # delete $x->{a} # qr/^Reference vivification forbidden/, undef, undef # +strict +delete
+$x # delete $x->{a} # '', undef, { } # +strict +store
+
+$x # delete $x->{a}->{b} # '', undef, { a => { } }
+$x # delete $x->{a}->{b} # '', undef, undef        #
+$x # delete $x->{a}->{b} # '', undef, { a => { } } # +fetch
+$x # delete $x->{a}->{b} # '', undef, { a => { } } # +exists
+$x # delete $x->{a}->{b} # '', undef, undef        # +delete
+$x # delete $x->{a}->{b} # '', undef, { a => { } } # +store
+
+$x # delete $x->{a}->{b} # '', undef, { a => { } } # +strict +fetch
+$x # delete $x->{a}->{b} # '', undef, { a => { } } # +strict +exists
+$x # delete $x->{a}->{b} # qr/^Reference vivification forbidden/, undef, undef # +strict +delete
+$x # delete $x->{a}->{b} # '', undef, { a => { } } # +strict +store
+
+$x->{a} = 1 # delete $x->{a} # '', 1,     { }        # +fetch
+$x->{a} = 1 # delete $x->{b} # '', undef, { a => 1 } # +fetch
+$x->{a} = 1 # delete $x->{a} # '', 1,     { }        # +exists
+$x->{a} = 1 # delete $x->{b} # '', undef, { a => 1 } # +exists
+$x->{a} = 1 # delete $x->{a} # '', 1,     { }        # +delete
+$x->{a} = 1 # delete $x->{b} # '', undef, { a => 1 } # +delete
+$x->{a} = 1 # delete $x->{a} # '', 1,     { }        # +store
+$x->{a} = 1 # delete $x->{b} # '', undef, { a => 1 } # +store
+
+$x->{a} = 1 # delete $x->{a} # '', 1,     { }        # +strict +fetch
+$x->{a} = 1 # delete $x->{b} # '', undef, { a => 1 } # +strict +fetch
+$x->{a} = 1 # delete $x->{a} # '', 1,     { }        # +strict +exists
+$x->{a} = 1 # delete $x->{b} # '', undef, { a => 1 } # +strict +exists
+$x->{a} = 1 # delete $x->{a} # '', 1,     { }        # +strict +delete
+$x->{a} = 1 # delete $x->{b} # '', undef, { a => 1 } # +strict +delete
+$x->{a} = 1 # delete $x->{a} # '', 1,     { }        # +strict +store
+$x->{a} = 1 # delete $x->{b} # '', undef, { a => 1 } # +strict +store
+
+$x->{a}->{b} = 1 # delete $x->{a}->{b} # '', 1,     { a => { } }       # +fetch
+$x->{a}->{b} = 1 # delete $x->{a}->{d} # '', undef, { a => { b => 1 } }# +fetch
+$x->{a}->{b} = 1 # delete $x->{c}->{d} # '', undef, { a => { b => 1 }, c => { } } # +fetch
+$x->{a}->{b} = 1 # delete $x->{a}->{b} # '', 1,     { a => { } }       # +exists
+$x->{a}->{b} = 1 # delete $x->{a}->{d} # '', undef, { a => { b => 1 } }# +exists
+$x->{a}->{b} = 1 # delete $x->{c}->{d} # '', undef, { a => { b => 1 }, c => { } } # +exists
+$x->{a}->{b} = 1 # delete $x->{a}->{b} # '', 1,     { a => { } }       # +delete
+$x->{a}->{b} = 1 # delete $x->{a}->{d} # '', undef, { a => { b => 1 } }# +delete
+$x->{a}->{b} = 1 # delete $x->{c}->{d} # '', undef, { a => { b => 1 } }# +delete
+$x->{a}->{b} = 1 # delete $x->{a}->{b} # '', 1,     { a => { } }       # +store
+$x->{a}->{b} = 1 # delete $x->{a}->{d} # '', undef, { a => { b => 1 } }# +store
+$x->{a}->{b} = 1 # delete $x->{c}->{d} # '', undef, { a => { b => 1 }, c => { } } # +store
+
+$x->{a}->{b} = 1 # delete $x->{a}->{b} # '', 1,     { a => { } }                # +strict +fetch
+$x->{a}->{b} = 1 # delete $x->{a}->{d} # '', undef, { a => { b => 1 } }         # +strict +fetch
+$x->{a}->{b} = 1 # delete $x->{c}->{d} # '', undef, { a => { b => 1 }, c => {} }# +strict +fetch
+$x->{a}->{b} = 1 # delete $x->{a}->{b} # '', 1,     { a => { } }                # +strict +exists
+$x->{a}->{b} = 1 # delete $x->{a}->{d} # '', undef, { a => { b => 1 } }         # +strict +exists
+$x->{a}->{b} = 1 # delete $x->{c}->{d} # '', undef, { a => { b => 1 }, c => {} }# +strict +exists
+$x->{a}->{b} = 1 # delete $x->{a}->{b} # '', 1,     { a => { } }                # +strict +delete
+$x->{a}->{b} = 1 # delete $x->{a}->{d} # '', undef, { a => { b => 1 } }         # +strict +delete
+$x->{a}->{b} = 1 # delete $x->{c}->{d} # qr/^Reference vivification forbidden/, undef, { a => { b => 1 } }  # +strict +delete
+$x->{a}->{b} = 1 # delete $x->{a}->{b} # '', 1,     { a => { } }                # +strict +store
+$x->{a}->{b} = 1 # delete $x->{a}->{d} # '', undef, { a => { b => 1 } }         # +strict +store
+$x->{a}->{b} = 1 # delete $x->{c}->{d} # '', undef, { a => { b => 1 }, c => {} }# +strict +store
+
+--- store ---
+
+$x # $x->{a} = 1 # '', 1, { a => 1 }
+$x # $x->{a} = 1 # '', 1, { a => 1 } #
+$x # $x->{a} = 1 # '', 1, { a => 1 } # +fetch
+$x # $x->{a} = 1 # '', 1, { a => 1 } # +exists
+$x # $x->{a} = 1 # '', 1, { a => 1 } # +delete
+$x # $x->{a} = 1 # qr/^Can't vivify reference/, undef, undef # +store
+
+$x # $x->{a} = 1 # '', 1, { a => 1 } # +strict +fetch
+$x # $x->{a} = 1 # '', 1, { a => 1 } # +strict +exists
+$x # $x->{a} = 1 # '', 1, { a => 1 } # +strict +delete
+$x # $x->{a} = 1 # qr/^Reference vivification forbidden/, undef, undef # +strict +store
+
+$x # $x->{a}->{b} = 1 # '', 1, { a => { b => 1 } }
+$x # $x->{a}->{b} = 1 # '', 1, { a => { b => 1 } } #
+$x # $x->{a}->{b} = 1 # '', 1, { a => { b => 1 } } # +fetch
+$x # $x->{a}->{b} = 1 # '', 1, { a => { b => 1 } } # +exists
+$x # $x->{a}->{b} = 1 # '', 1, { a => { b => 1 } } # +delete
+$x # $x->{a}->{b} = 1 # qr/^Can't vivify reference/, undef, undef # +store
+
+$x # $x->{a}->{b} = 1 # '', 1, { a => { b => 1 } } # +strict +fetch
+$x # $x->{a}->{b} = 1 # '', 1, { a => { b => 1 } } # +strict +exists
+$x # $x->{a}->{b} = 1 # '', 1, { a => { b => 1 } } # +strict +delete
+$x # $x->{a}->{b} = 1 # qr/^Reference vivification forbidden/, undef, undef # +strict +store
+
+$x->{a} = 1 # $x->{a} = 2 # '', 2, { a => 2 }         # +fetch
+$x->{a} = 1 # $x->{b} = 2 # '', 2, { a => 1, b => 2 } # +fetch
+$x->{a} = 1 # $x->{a} = 2 # '', 2, { a => 2 }         # +exists
+$x->{a} = 1 # $x->{b} = 2 # '', 2, { a => 1, b => 2 } # +exists
+$x->{a} = 1 # $x->{a} = 2 # '', 2, { a => 2 }         # +delete
+$x->{a} = 1 # $x->{b} = 2 # '', 2, { a => 1, b => 2 } # +delete
+$x->{a} = 1 # $x->{a} = 2 # '', 2, { a => 2 }         # +store
+$x->{a} = 1 # $x->{b} = 2 # '', 2, { a => 1, b => 2 } # +store
+
+$x->{a} = 1 # $x->{a} = 2 # '', 2, { a => 2 }         # +strict +fetch
+$x->{a} = 1 # $x->{b} = 2 # '', 2, { a => 1, b => 2 } # +strict +fetch
+$x->{a} = 1 # $x->{a} = 2 # '', 2, { a => 2 }         # +strict +exists
+$x->{a} = 1 # $x->{b} = 2 # '', 2, { a => 1, b => 2 } # +strict +exists
+$x->{a} = 1 # $x->{a} = 2 # '', 2, { a => 2 }         # +strict +delete
+$x->{a} = 1 # $x->{b} = 2 # '', 2, { a => 1, b => 2 } # +strict +delete
+$x->{a} = 1 # $x->{a} = 2 # '', 2, { a => 2 }         # +strict +store
+$x->{a} = 1 # $x->{b} = 2 # '', 2, { a => 1, b => 2 } # +strict +store
+
+$x->{a}->{b} = 1 # $x->{a}->{b} = 2 # '', 2, { a => { b => 2 } }                # +fetch
+$x->{a}->{b} = 1 # $x->{a}->{d} = 2 # '', 2, { a => { b => 1, d => 2 } }        # +fetch
+$x->{a}->{b} = 1 # $x->{c}->{d} = 2 # '', 2, { a => { b => 1 }, c => { d => 2 } } # +fetch
+$x->{a}->{b} = 1 # $x->{a}->{b} = 2 # '', 2, { a => { b => 2 } }                # +exists
+$x->{a}->{b} = 1 # $x->{a}->{d} = 2 # '', 2, { a => { b => 1, d => 2 } }        # +exists
+$x->{a}->{b} = 1 # $x->{c}->{d} = 2 # '', 2, { a => { b => 1 }, c => { d => 2 } } # +exists
+$x->{a}->{b} = 1 # $x->{a}->{b} = 2 # '', 2, { a => { b => 2 } }                # +delete
+$x->{a}->{b} = 1 # $x->{a}->{d} = 2 # '', 2, { a => { b => 1, d => 2 } }        # +delete
+$x->{a}->{b} = 1 # $x->{c}->{d} = 2 # '', 2, { a => { b => 1 }, c => { d => 2 } } # +delete
+$x->{a}->{b} = 1 # $x->{a}->{b} = 2 # '', 2, { a => { b => 2 } }                # +store
+$x->{a}->{b} = 1 # $x->{a}->{d} = 2 # '', 2, { a => { b => 1, d => 2 } }        # +store
+$x->{a}->{b} = 1 # $x->{c}->{d} = 2 # qr/^Can't vivify reference/, undef, { a => { b => 1 } } # +store
+
+$x->{a}->{b} = 1 # $x->{a}->{b} = 2 # '', 2, { a => { b => 2 } }                # +strict +fetch
+$x->{a}->{b} = 1 # $x->{a}->{d} = 2 # '', 2, { a => { b => 1, d => 2 } }        # +strict +fetch
+$x->{a}->{b} = 1 # $x->{c}->{d} = 2 # '', 2, { a => { b => 1 }, c => { d => 2 } } # +strict +fetch
+$x->{a}->{b} = 1 # $x->{a}->{b} = 2 # '', 2, { a => { b => 2 } }                # +strict +exists
+$x->{a}->{b} = 1 # $x->{a}->{d} = 2 # '', 2, { a => { b => 1, d => 2 } }        # +strict +exists
+$x->{a}->{b} = 1 # $x->{c}->{d} = 2 # '', 2, { a => { b => 1 }, c => { d => 2 } } # +strict +exists
+$x->{a}->{b} = 1 # $x->{a}->{b} = 2 # '', 2, { a => { b => 2 } }                # +strict +delete
+$x->{a}->{b} = 1 # $x->{a}->{d} = 2 # '', 2, { a => { b => 1, d => 2 } }        # +strict +delete
+$x->{a}->{b} = 1 # $x->{c}->{d} = 2 # '', 2, { a => { b => 1 }, c => { d => 2 } } # +strict +delete
+$x->{a}->{b} = 1 # $x->{a}->{b} = 2 # '', 2, { a => { b => 2 } }                # +strict +store
+$x->{a}->{b} = 1 # $x->{a}->{d} = 2 # '', 2, { a => { b => 1, d => 2 } }        # +strict +store
+$x->{a}->{b} = 1 # $x->{c}->{d} = 2 # qr/^Reference vivification forbidden/, undef, { a => { b => 1 } } # +strict +store
