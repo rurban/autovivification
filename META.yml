@@ -1,7 +1,7 @@
 --- #YAML:1.0
 name:               autovivification
 version:            0.01
-abstract:           ~
+abstract:           Lexically disable autovivification.
 author:
     - Vincent Pit <perl@profvince.com>
 license:            perl
