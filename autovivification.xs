@@ -259,6 +259,8 @@ STATIC OP *a_pp_rv2av(pTHX) {
  dSP;
 
  if (!SvOK(TOPs)) {
+  /* We always need to push an empty array to fool the pp_aelem() that comes
+   * later. */
   SV *av;
   POPs;
   av = sv_2mortal((SV *) newAV());
@@ -278,10 +280,17 @@ STATIC OP *a_pp_rv2hv(pTHX) {
  UV hint;
  dSP;
 
- if (!SvOK(TOPs))
-  RETURN;
-
  a_map_fetch(PL_op, &oi);
+
+ if (!SvOK(TOPs)) {
+  if (oi.root->op_flags & OPf_MOD) {
+   SV *hv;
+   POPs;
+   hv = sv_2mortal((SV *) newHV());
+   PUSHs(hv);
+  }
+  RETURN;
+ }
 
  return CALL_FPTR(oi.old_pp)(aTHX);
 }
@@ -325,11 +334,11 @@ deref:
  } else if (flags && (PL_op->op_private & OPpDEREF || PL_op == oi.root)) {
   oi.flags = flags & A_HINT_NOTIFY;
 
-  if (oi.root->op_flags & OPf_MOD) {
-   if (flags & A_HINT_STORE)
+  if ((oi.root->op_flags & (OPf_MOD|OPf_REF)) != (OPf_MOD|OPf_REF)) {
+   if (flags & A_HINT_FETCH)
+    oi.flags |= (A_HINT_FETCH|A_HINT_DEREF);
+  } else if (flags & A_HINT_STORE)
     oi.flags |= (A_HINT_STORE|A_HINT_DEREF);
-  } else if (flags & A_HINT_FETCH)
-   oi.flags |= (A_HINT_FETCH|A_HINT_DEREF);
 
   if (PL_op == oi.root)
    oi.flags &= ~A_HINT_DEREF;

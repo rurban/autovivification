@@ -3,7 +3,7 @@
 use strict;
 use warnings;
 
-use Test::More tests => 6 * 3 * 240;
+use Test::More tests => 6 * 3 * 260;
 
 sub testcase {
  my ($var, $init, $code, $exp, $use, $global) = @_;
@@ -147,6 +147,31 @@ $x->{a}->{b} = 1 # $x->{c}->{d} # '', undef, { a => { b => 1 }, c => { } }      
 $x->{a}->{b} = 1 # $x->{a}->{b} # '', 1,     { a => { b => 1 } }                # +strict +store
 $x->{a}->{b} = 1 # $x->{a}->{d} # '', undef, { a => { b => 1 } }                # +strict +store
 $x->{a}->{b} = 1 # $x->{c}->{d} # '', undef, { a => { b => 1 }, c => { } }      # +strict +store
+
+--- aliasing ---
+
+$x # 1 for $x->{a}; () # '', undef, { a => undef }
+$x # 1 for $x->{a}; () # '', undef, undef          #
+$x # 1 for $x->{a}; () # '', undef, undef          # +fetch
+$x # 1 for $x->{a}; () # '', undef, { a => undef } # +exists
+$x # 1 for $x->{a}; () # '', undef, { a => undef } # +delete
+$x # 1 for $x->{a}; () # '', undef, { a => undef } # +store
+
+$x # $_ = 1 for $x->{a}; () # '', undef, { a => 1 }
+$x # $_ = 1 for $x->{a}; () # '', undef, undef      #
+$x # $_ = 1 for $x->{a}; () # '', undef, undef      # +fetch
+$x # $_ = 1 for $x->{a}; () # '', undef, { a => 1 } # +exists
+$x # $_ = 1 for $x->{a}; () # '', undef, { a => 1 } # +delete
+$x # $_ = 1 for $x->{a}; () # '', undef, { a => 1 } # +store
+
+$x->{a} = 1 # 1 for $x->{a}; () # '', undef, { a => 1 }             # +fetch
+$x->{a} = 1 # 1 for $x->{b}; () # '', undef, { a => 1, b => undef } # +fetch
+$x->{a} = 1 # 1 for $x->{a}; () # '', undef, { a => 1 }             # +exists
+$x->{a} = 1 # 1 for $x->{b}; () # '', undef, { a => 1, b => undef } # +exists
+$x->{a} = 1 # 1 for $x->{a}; () # '', undef, { a => 1 }             # +delete
+$x->{a} = 1 # 1 for $x->{b}; () # '', undef, { a => 1, b => undef } # +delete
+$x->{a} = 1 # 1 for $x->{a}; () # '', undef, { a => 1 }             # +store
+$x->{a} = 1 # 1 for $x->{b}; () # '', undef, { a => 1, b => undef } # +store
 
 --- exists ---
 
