@@ -49,6 +49,7 @@ while (<$hash_t>) {
   }
   $buf .= $suffix;
   $buf =~ s/\s+/ /g;
+  $buf =~ s/\s+$//;
   print $array_t "$buf\n";
  }
 }
