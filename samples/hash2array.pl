@@ -37,7 +37,7 @@ while (<$hash_t>) {
   $in_data = 1;
   print $array_t $_;
  } elsif (!$in_data) {
-  s{s/\^\$/%/}{s/^\$/@/};
+  s{'%'}{'\@'};
   print $array_t $_;
  } else {
   s!->{([a-z])}!'->[' . num($1) . ']'!eg;
