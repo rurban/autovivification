@@ -217,12 +217,28 @@ STATIC void a_map_set_root(const OP *root, UV flags) {
   }
   if (!(o->op_flags & OPf_KIDS))
    break;
-  o = cUNOPo->op_first;
+  switch (PL_opargs[o->op_type] & OA_CLASS_MASK) {
+   case OA_BASEOP:
+   case OA_UNOP:
+   case OA_BINOP:
+   case OA_BASEOP_OR_UNOP:
+    o = cUNOPo->op_first;
+    break;
+   case OA_LIST:
+   case OA_LISTOP:
+    o = cLISTOPo->op_last;
+    break;
+   default:
+    goto done;
+  }
  }
 
+done:
 #ifdef USE_ITHREADS
  MUTEX_UNLOCK(&a_op_map_mutex);
 #endif
+
+ return;
 }
 
 /* ... Lightweight pp_defined() ............................................ */
@@ -472,21 +488,37 @@ STATIC OP *a_ck_deref(pTHX_ OP *o) {
 
  hint = a_hint();
  if (hint & A_HINT_DO) {
-  if (!(hint & A_HINT_STRICT) && o->op_flags & OPf_KIDS) {
-   OP *kid = cUNOPo->op_first;
-   switch (kid->op_type) {
-    case OP_RV2AV:
-     a_map_store(kid, kid->op_ppaddr, hint);
-     kid->op_ppaddr = a_pp_rv2av;
-     break;
-    case OP_RV2HV:
-     a_map_store(kid, kid->op_ppaddr, hint);
-     kid->op_ppaddr = a_pp_rv2hv;
-     break;
-   }
-  }
   a_map_store(o, o->op_ppaddr, hint);
   o->op_ppaddr = a_pp_deref;
+  a_map_set_root(o, hint);
+ } else
+  a_map_delete(o);
+
+ return o;
+}
+
+/* ... ck_rv2xv (rv2av,rv2hv) .............................................. */
+
+STATIC OP *(*a_old_ck_rv2av)(pTHX_ OP *) = 0;
+STATIC OP *(*a_old_ck_rv2hv)(pTHX_ OP *) = 0;
+
+STATIC OP *a_ck_rv2xv(pTHX_ OP *o) {
+ OP * (*old_ck)(pTHX_ OP *o) = 0;
+ OP * (*new_pp)(pTHX)        = 0;
+ UV hint;
+
+ switch (o->op_type) {
+  case OP_RV2AV: old_ck = a_old_ck_rv2av; new_pp = a_pp_rv2av; break;
+  case OP_RV2HV: old_ck = a_old_ck_rv2hv; new_pp = a_pp_rv2hv; break;
+ }
+ o = CALL_FPTR(old_ck)(aTHX_ o);
+
+ hint = a_hint();
+ if (hint & A_HINT_DO) {
+  if (!(hint & A_HINT_STRICT)) {
+   a_map_store(o, o->op_ppaddr, hint);
+   o->op_ppaddr = new_pp;
+  }
   a_map_set_root(o, hint);
  } else
   a_map_delete(o);
@@ -557,6 +589,10 @@ BOOT:
   PL_check[OP_HELEM]  = MEMBER_TO_FPTR(a_ck_deref);
   a_old_ck_rv2sv      = PL_check[OP_RV2SV];
   PL_check[OP_RV2SV]  = MEMBER_TO_FPTR(a_ck_deref);
+  a_old_ck_rv2av      = PL_check[OP_RV2AV];
+  PL_check[OP_RV2AV]  = MEMBER_TO_FPTR(a_ck_rv2xv);
+  a_old_ck_rv2hv      = PL_check[OP_RV2HV];
+  PL_check[OP_RV2HV]  = MEMBER_TO_FPTR(a_ck_rv2xv);
   a_old_ck_exists     = PL_check[OP_EXISTS];
   PL_check[OP_EXISTS] = MEMBER_TO_FPTR(a_ck_root);
   a_old_ck_delete     = PL_check[OP_DELETE];
