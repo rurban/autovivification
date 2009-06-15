@@ -304,9 +304,8 @@ STATIC OP *a_pp_deref(pTHX) {
   U8 old_private;
 
 deref:
-  old_private = PL_op->op_private;
-  PL_op->op_private &= ~OPpDEREF;
-  PL_op->op_private |= OPpLVAL_DEFER;
+  old_private       = PL_op->op_private;
+  PL_op->op_private = ((old_private & ~OPpDEREF) | OPpLVAL_DEFER);
   o = CALL_FPTR(oi.old_pp)(aTHX);
   PL_op->op_private = old_private;
 
