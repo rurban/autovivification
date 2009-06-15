@@ -189,6 +189,19 @@ STATIC const a_op_info *a_map_fetch(const OP *o, a_op_info *oi) {
  return val;
 }
 
+STATIC void a_map_delete(pTHX_ const OP *o) {
+#define a_map_delete(O) a_map_delete(aTHX_ (O))
+#ifdef USE_ITHREADS
+ MUTEX_LOCK(&a_op_map_mutex);
+#endif
+
+ ptable_map_store(a_op_map, o, NULL);
+
+#ifdef USE_ITHREADS
+ MUTEX_UNLOCK(&a_op_map_mutex);
+#endif
+}
+
 STATIC void a_map_set_root(const OP *root, UV flags) {
  a_op_info *oi;
  const OP *o = root;
@@ -408,7 +421,7 @@ STATIC OP *a_ck_padany(pTHX_ OP *o) {
   a_pp_padsv_save();
   a_map_store(o, a_pp_padsv_saved, hint);
  } else
-  a_map_store(o, 0, 0);
+  a_map_delete(o);
 
  return o;
 }
@@ -427,7 +440,7 @@ STATIC OP *a_ck_padsv(pTHX_ OP *o) {
   a_map_store(o, o->op_ppaddr, hint);
   o->op_ppaddr = a_pp_deref;
  } else
-  a_map_store(o, 0, 0);
+  a_map_delete(o);
 
  return o;
 }
@@ -468,7 +481,7 @@ STATIC OP *a_ck_deref(pTHX_ OP *o) {
   o->op_ppaddr = a_pp_deref;
   a_map_set_root(o, hint);
  } else
-  a_map_store(o, 0, 0);
+  a_map_delete(o);
 
  return o;
 }
