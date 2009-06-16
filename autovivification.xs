@@ -548,13 +548,16 @@ STATIC OP *a_ck_root(pTHX_ OP *o) {
  }
  o = CALL_FPTR(old_ck)(aTHX_ o);
 
- if (enabled) {
-  a_map_set_root(o, hint | A_HINT_DEREF);
-  a_map_store(o, o->op_ppaddr, hint);
-  o->op_ppaddr = a_pp_root;
- } else {
-  a_map_set_root(o, 0);
- }
+ if (hint & A_HINT_DO) {
+  if (enabled) {
+   a_map_set_root(o, hint | A_HINT_DEREF);
+   a_map_store(o, o->op_ppaddr, hint);
+   o->op_ppaddr = a_pp_root;
+  } else {
+   a_map_set_root(o, 0);
+  }
+ } else
+  a_map_delete(o);
 
  return o;
 }
