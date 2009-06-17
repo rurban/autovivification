@@ -12,11 +12,13 @@ sub import {
 
 sub in_strict { (caller 0)[8] & (eval { strict::bits(@_) } || 0) };
 
-sub source {
- my ($var, $init, $code, $exp, $use, $global) = @_;
+sub generate {
+ my ($var, $init, $code, $exp, $use, $opts, $global) = @_;
  my $decl = $global ? "our $var; local $var;" : "my $var;";
  my $test = $var =~ /^[@%]/ ? "\\$var" : $var;
- return <<TESTCASE;
+ my $desc = join('; ', map { my $x = $_; $x=~ s,;\s*$,,; $x }
+                                   grep /\S/, $decl, $init, $code) . " <$opts>";
+ return <<TESTCASE, $desc;
 $decl
 $init
 my \$strict = autovivification::TestCases::in_strict('refs');
@@ -59,9 +61,9 @@ sub testcase_ok {
   $use  = '';
  }
  my @testcases = (
-  [ $var, $init,               $code, $exp, $use, 0 ],
-  [ $var, "use strict; $init", $code, $exp, $use, 1 ],
-  [ $var, "no strict;  $init", $code, $exp, $use, 1 ],
+  [ $var, $init,               $code, $exp, $use, $opts, 0 ],
+  [ $var, "use strict; $init", $code, $exp, $use, $opts, 1 ],
+  [ $var, "no strict;  $init", $code, $exp, $use, $opts, 1 ],
  );
  my @extra;
  for (@testcases) {
@@ -91,9 +93,7 @@ sub testcase_ok {
  }
  push @testcases, @extra;
  for (@testcases) {
-  my $testcase = source(@$_);
-  my ($var, $init, $code) = @$_;
-  my $desc = do { (my $x = "$var | $init") =~ s,;\s+$,,; $x } . " | $code | $opts";
+  my ($testcase, $desc) = generate(@$_);
   eval $testcase;
   diag "== This testcase failed to compile ==\n$testcase\n## Reason: $@" if $@;
  }
