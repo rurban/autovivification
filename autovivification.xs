@@ -176,11 +176,7 @@ STATIC const a_op_info *a_map_fetch(const OP *o, a_op_info *oi) {
 #endif
 
  val = ptable_fetch(a_op_map, o);
- if (val) {
-  *oi = *val;
-  val = oi;
- } else
-  oi->old_pp = 0;
+ *oi = *val;
 
 #ifdef USE_ITHREADS
  MUTEX_UNLOCK(&a_op_map_mutex);
