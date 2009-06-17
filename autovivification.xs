@@ -309,9 +309,6 @@ STATIC OP *a_pp_rv2hv(pTHX) {
 
 /* ... pp_deref (aelem,helem,rv2sv,padsv) .................................. */
 
-STATIC const char a_msg_forbidden[]  = "Reference vivification forbidden";
-STATIC const char a_msg_impossible[] = "Can't vivify reference";
-
 STATIC OP *a_pp_deref(pTHX) {
  a_op_info oi;
  UV flags;
@@ -334,11 +331,11 @@ deref:
    SPAGAIN;
    if (!SvOK(TOPs)) {
     if (flags & A_HINT_STRICT)
-     croak(a_msg_forbidden);
+     croak("Reference vivification forbidden");
     else if (flags & A_HINT_WARN)
-      warn(a_msg_forbidden);
+      warn("Reference was vivified");
     else /* A_HINT_STORE */
-     croak(a_msg_impossible);
+     croak("Can't vivify reference");
    }
   }
 
