@@ -3,7 +3,7 @@
 use strict;
 use warnings;
 
-use Test::More tests => 6 * 3 * 270;
+use Test::More tests => 6 * 3 * 274;
 
 use lib 't/lib';
 use autovivification::TestCases;
@@ -24,6 +24,11 @@ $x # $x->[0] # '', undef, undef # +fetch
 $x # $x->[0] # '', undef, [ ] # +exists
 $x # $x->[0] # '', undef, [ ] # +delete
 $x # $x->[0] # '', undef, [ ] # +store
+
+$x # $x->[0] # '', undef, [ ] # -fetch
+$x # $x->[0] # '', undef, [ ] # +fetch -fetch
+$x # $x->[0] # '', undef, undef # -fetch +fetch
+$x # $x->[0] # '', undef, undef # +fetch -exists
 
 $x # $x->[0] # qr/^Reference vivification forbidden/, undef, undef # +strict +fetch
 $x # $x->[0] # '', undef, [ ] # +strict +exists
