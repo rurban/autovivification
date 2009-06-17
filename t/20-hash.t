@@ -3,7 +3,7 @@
 use strict;
 use warnings;
 
-use Test::More tests => 6 * 3 * 260;
+use Test::More tests => 6 * 3 * 270;
 
 use lib 't/lib';
 use autovivification::TestCases;
@@ -110,6 +110,20 @@ $x->{a} = 1 # 1 for $x->{a}; () # '', undef, { a => 1 }             # +delete
 $x->{a} = 1 # 1 for $x->{b}; () # '', undef, { a => 1, b => undef } # +delete
 $x->{a} = 1 # 1 for $x->{a}; () # '', undef, { a => 1 }             # +store
 $x->{a} = 1 # 1 for $x->{b}; () # '', undef, { a => 1, b => undef } # +store
+
+--- dereferencing ---
+
+$x # no warnings 'uninitialized'; my @a = %$x; () # ($strict ? qr/Can't use an undefined value as a HASH reference/ : ''), undef, undef
+$x # no warnings 'uninitialized'; my @a = %$x; () # ($strict ? qr/Can't use an undefined value as a HASH reference/ : ''), undef, undef #
+$x # no warnings 'uninitialized'; my @a = %$x; () # ($strict ? qr/Can't use an undefined value as a HASH reference/ : ''), undef, undef # +fetch
+$x # no warnings 'uninitialized'; my @a = %$x; () # ($strict ? qr/Can't use an undefined value as a HASH reference/ : ''), undef, undef # +exists
+$x # no warnings 'uninitialized'; my @a = %$x; () # ($strict ? qr/Can't use an undefined value as a HASH reference/ : ''), undef, undef # +delete
+$x # no warnings 'uninitialized'; my @a = %$x; () # ($strict ? qr/Can't use an undefined value as a HASH reference/ : ''), undef, undef # +store
+
+$x->{a} = 1 # my @a = %$x; () # '', undef, { a => 1 } # +fetch
+$x->{a} = 1 # my @a = %$x; () # '', undef, { a => 1 } # +exists
+$x->{a} = 1 # my @a = %$x; () # '', undef, { a => 1 } # +delete
+$x->{a} = 1 # my @a = %$x; () # '', undef, { a => 1 } # +store
 
 --- exists ---
 

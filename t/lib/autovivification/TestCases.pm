@@ -10,14 +10,17 @@ sub import {
  *{caller().'::testcase_ok'} = \&testcase_ok;
 }
 
+sub in_strict { (caller 0)[8] & (eval { strict::bits(@_) } || 0) };
+
 sub source {
  my ($var, $init, $code, $exp, $use, $global) = @_;
  my $decl = $global ? "our $var; local $var;" : "my $var;";
  my $test = $var =~ /^[@%]/ ? "\\$var" : $var;
  return <<TESTCASE;
-my \@exp = ($exp);
 $decl
 $init
+my \$strict = autovivification::TestCases::in_strict('refs');
+my \@exp = ($exp);
 my \$res = eval {
  local \$SIG{__WARN__} = sub { die join '', 'warn:', \@_ };
  $use

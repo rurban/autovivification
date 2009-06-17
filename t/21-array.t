@@ -3,7 +3,7 @@
 use strict;
 use warnings;
 
-use Test::More tests => 6 * 3 * 260;
+use Test::More tests => 6 * 3 * 270;
 
 use lib 't/lib';
 use autovivification::TestCases;
@@ -110,6 +110,20 @@ $x->[0] = 1 # 1 for $x->[0]; () # '', undef, [ 1 ] # +delete
 $x->[0] = 1 # 1 for $x->[1]; () # '', undef, [ 1, undef ] # +delete
 $x->[0] = 1 # 1 for $x->[0]; () # '', undef, [ 1 ] # +store
 $x->[0] = 1 # 1 for $x->[1]; () # '', undef, [ 1, undef ] # +store
+
+--- dereferencing ---
+
+$x # no warnings 'uninitialized'; my @a = @$x; () # ($strict ? qr/Can't use an undefined value as an ARRAY reference/ : ''), undef, undef
+$x # no warnings 'uninitialized'; my @a = @$x; () # ($strict ? qr/Can't use an undefined value as an ARRAY reference/ : ''), undef, undef #
+$x # no warnings 'uninitialized'; my @a = @$x; () # ($strict ? qr/Can't use an undefined value as an ARRAY reference/ : ''), undef, undef # +fetch
+$x # no warnings 'uninitialized'; my @a = @$x; () # ($strict ? qr/Can't use an undefined value as an ARRAY reference/ : ''), undef, undef # +exists
+$x # no warnings 'uninitialized'; my @a = @$x; () # ($strict ? qr/Can't use an undefined value as an ARRAY reference/ : ''), undef, undef # +delete
+$x # no warnings 'uninitialized'; my @a = @$x; () # ($strict ? qr/Can't use an undefined value as an ARRAY reference/ : ''), undef, undef # +store
+
+$x->[0] = 1 # my @a = @$x; () # '', undef, [ 1 ] # +fetch
+$x->[0] = 1 # my @a = @$x; () # '', undef, [ 1 ] # +exists
+$x->[0] = 1 # my @a = @$x; () # '', undef, [ 1 ] # +delete
+$x->[0] = 1 # my @a = @$x; () # '', undef, [ 1 ] # +store
 
 --- exists ---
 

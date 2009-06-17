@@ -274,7 +274,9 @@ STATIC OP *a_pp_rv2av(pTHX) {
  UV hint;
  dSP;
 
- if (!SvOK(TOPs)) {
+ a_map_fetch(PL_op, &oi);
+
+ if (PL_op != oi.root && !SvOK(TOPs)) {
   /* We always need to push an empty array to fool the pp_aelem() that comes
    * later. */
   SV *av;
@@ -283,8 +285,6 @@ STATIC OP *a_pp_rv2av(pTHX) {
   PUSHs(av);
   RETURN;
  }
-
- a_map_fetch(PL_op, &oi);
 
  return CALL_FPTR(oi.old_pp)(aTHX);
 }
@@ -298,7 +298,7 @@ STATIC OP *a_pp_rv2hv(pTHX) {
 
  a_map_fetch(PL_op, &oi);
 
- if (!SvOK(TOPs)) {
+ if (PL_op != oi.root && !SvOK(TOPs)) {
   if (oi.root->op_flags & OPf_MOD) {
    SV *hv;
    POPs;

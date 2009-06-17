@@ -40,7 +40,9 @@ while (<$hash_t>) {
   s{'%'}{'\@'};
   print $array_t $_;
  } else {
+  s!(\ba\b)?(\s*)HASH\b!($1 ? 'an': '') . "$2ARRAY"!eg;
   s!->{([a-z])}!'->[' . num($1) . ']'!eg;
+  s!%(\{?)\$!\@$1\$!g;
   my $buf;
   my $suffix = $_;
   my ($bracket, $prefix);
