@@ -68,9 +68,24 @@ sub testcase_ok {
   my $var = $_->[0];
   if ($var =~ /\$/) {
    my @new = @$_;
-   $new[0] =~ s/^$/$sigil/;
-   $new[1] =~ s/$var\->/$var/g;
-   $new[2] =~ s/$var\->/$var/g;
+   $new[0] =~ s/^\$/$sigil/;
+   for ($new[1], $new[2]) {
+    s/\Q$sigil$var\E/$new[0]/g;
+    s/\Q$var\E\->/$var/g;
+   }
+   my $simple      = $new[2] !~ /->/;
+   my $plain_deref = $new[2] =~ /\Q$new[0]\E/;
+   my $empty  = { '@' => '[ ]', '%' => '{ }' }->{$sigil};
+   if (($simple
+        and (   $new[3] =~ m!qr/\^Reference vivification forbidden.*?/!
+             or $new[3] =~ m!qr/\^Can't vivify reference.*?/!))
+    or ($plain_deref
+        and $new[3] =~ m!qr/\^Can't use an undefined value as a.*?/!)) {
+    $new[1] = '';
+    $new[2] = 1;
+    $new[3] = "'', 1, $empty";
+   }
+   $new[3] =~ s/,\s*undef\s*$/, $empty/;
    push @extra, \@new;
   }
  }
