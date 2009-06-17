@@ -545,7 +545,7 @@ STATIC OP *a_ck_rv2xv(pTHX_ OP *o) {
  return o;
 }
 
-/* ... ck_root (exists,delete) ............................................. */
+/* ... ck_root (exists,delete,keys,values) ................................. */
 
 STATIC OP *(*a_old_ck_exists)(pTHX_ OP *) = 0;
 STATIC OP *(*a_old_ck_delete)(pTHX_ OP *) = 0;
