@@ -1,5 +1,13 @@
 Revision history for autovivification
 
+0.02    2009-06-17 18:05 UTC
+        + Add : 'fetch' also applies to aliasing ("for ($hashref->{key}) { }").
+        + Fix : Don't segfault on "keys/values %$hashref", and don't vivify if
+                'fetch' is set.
+        + Fix : Plain dereferencing shouldn't have a different behaviour when
+                the pragma is in use.
+        + Tst : Improved coverage.
+
 0.01    2009-06-14 20:10 UTC
         First version, released on an unsuspecting world.
 

@@ -2,7 +2,7 @@ NAME
     autovivification - Lexically disable autovivification.
 
 VERSION
-    Version 0.01
+    Version 0.02
 
 SYNOPSIS
         no autovivification;
@@ -40,8 +40,11 @@ METHODS
     *   'fetch'
 
         Turn off autovivification for rvalue dereferencing expressions, such
-        as "$value = $hashref->{key}[$idx]{$field}". "undef" is returned
-        when the expression would have autovivified.
+        as "$value = $hashref->{key}[$idx]{$field}", "keys
+        %{$hashref->{key}}" or "values %{$hashref->{key}}". When the
+        expression would have autovivified, "undef" is returned for a plain
+        fetch, while "keys" and "values" return 0 in scalar context and the
+        empty list in list context.
 
     *   'exists'
 
