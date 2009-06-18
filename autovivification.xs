@@ -525,6 +525,9 @@ STATIC OP *a_ck_rv2xv(pTHX_ OP *o) {
  }
  o = CALL_FPTR(old_ck)(aTHX_ o);
 
+ if (cUNOPo->op_first->op_type == OP_GV)
+  return o;
+
  hint = a_hint();
  if (hint & A_HINT_DO) {
   if (!(hint & A_HINT_STRICT)) {
