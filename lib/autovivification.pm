@@ -85,7 +85,7 @@ C<undef> is returned when the expression would have autovivified.
 
 C<'store'>
 
-Turn off autovivification for lvalue dereferencing expressions, such as C<< $hashref->{key}[$idx]{$field} = $value >>.
+Turn off autovivification for lvalue dereferencing expressions, such as C<< $hashref->{key}[$idx]{$field} = $value >> or C<< for ($hashref->{key}[$idx]{$field}) { ... } >>.
 An exception is thrown if vivification is needed to store the value, which means that effectively you can only assign to levels that are already defined (in the example, this would require C<< $hashref->{key}[$idx] >> to already be a hash reference).
 
 =item *
