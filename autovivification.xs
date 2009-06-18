@@ -115,7 +115,7 @@ STATIC U32 a_hash = 0;
 
 STATIC UV a_hint(pTHX) {
 #define a_hint() a_hint(aTHX)
- const SV *hint;
+ SV *hint;
 #if A_HAS_PERL(5, 9, 5)
  hint = Perl_refcounted_he_fetch(aTHX_ PL_curcop->cop_hints_hash,
                                        NULL,
