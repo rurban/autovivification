@@ -272,7 +272,9 @@ STATIC OP *a_pp_rv2av(pTHX) {
 
  a_map_fetch(PL_op, &oi);
 
- if (PL_op != oi.root && !SvOK(TOPs)) {
+ if (PL_op == oi.root) { /* This means "@$arrayref" */
+  PL_op->op_ppaddr = oi.old_pp;
+ } else if (!SvOK(TOPs)) {
   /* We always need to push an empty array to fool the pp_aelem() that comes
    * later. */
   SV *av;
@@ -294,7 +296,9 @@ STATIC OP *a_pp_rv2hv(pTHX) {
 
  a_map_fetch(PL_op, &oi);
 
- if (PL_op != oi.root && !SvOK(TOPs)) {
+ if (PL_op == oi.root) { /* This means "%$hashref" */
+  PL_op->op_ppaddr = oi.old_pp;
+ } else if (!SvOK(TOPs)) {
   if (oi.root->op_flags & OPf_MOD) {
    SV *hv;
    POPs;
