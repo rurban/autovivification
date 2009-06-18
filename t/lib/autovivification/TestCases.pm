@@ -94,6 +94,7 @@ sub testcase_ok {
  push @testcases, @extra;
  for (@testcases) {
   my ($testcase, $desc) = generate(@$_);
+  my @N = (0 .. 9);
   eval $testcase;
   diag "== This testcase failed to compile ==\n$testcase\n## Reason: $@" if $@;
  }
