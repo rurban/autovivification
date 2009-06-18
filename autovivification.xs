@@ -21,66 +21,73 @@
 
 #if A_WORKAROUND_REQUIRE_PROPAGATION
 
-typedef struct {
- UV  bits;
- I32 requires;
-} a_hint_t;
+#define A_ENCODE_UV(B, U)   \
+ len = 0;                   \
+ while (len < sizeof(UV)) { \
+  (B)[len++] = (U) & 0xFF;  \
+  (U) >>= 8;                \
+ }
+
+#define A_DECODE_UV(U, B)        \
+ len = sizeof(UV);               \
+ while (len > 0)                 \
+  (U) = ((U) << 8) | (B)[--len];
 
 STATIC SV *a_tag(pTHX_ UV bits) {
 #define a_tag(B) a_tag(aTHX_ (B))
- SV *tag;
- a_hint_t h;
+ SV            *hint;
+ const PERL_SI *si;
+ UV             requires = 0;
+ unsigned char  buf[sizeof(UV) * 2];
+ STRLEN         len;
 
- h.bits = bits;
+ for (si = PL_curstackinfo; si; si = si->si_prev) {
+  I32 cxix;
 
- {
-  const PERL_SI *si;
-  I32            requires = 0;
+  for (cxix = si->si_cxix; cxix >= 0; --cxix) {
+   const PERL_CONTEXT *cx = si->si_cxstack + cxix;
 
-  for (si = PL_curstackinfo; si; si = si->si_prev) {
-   I32 cxix;
-
-   for (cxix = si->si_cxix; cxix >= 0; --cxix) {
-    const PERL_CONTEXT *cx = si->si_cxstack + cxix;
-
-    if (CxTYPE(cx) == CXt_EVAL && cx->blk_eval.old_op_type == OP_REQUIRE)
-     ++requires;
-   }
+   if (CxTYPE(cx) == CXt_EVAL && cx->blk_eval.old_op_type == OP_REQUIRE)
+    ++requires;
   }
-
-  h.requires = requires;
  }
 
- return newSVpvn((const char *) &h, sizeof h);
+ A_ENCODE_UV(buf,              requires);
+ A_ENCODE_UV(buf + sizeof(UV), bits);
+ hint = newSVpvn(buf, sizeof buf);
+ SvREADONLY_on(hint);
+
+ return hint;
 }
 
 STATIC UV a_detag(pTHX_ const SV *hint) {
 #define a_detag(H) a_detag(aTHX_ (H))
- const a_hint_t *h;
+ const PERL_SI *si;
+ UV             requires = 0, requires_max = 0, bits = 0;
+ unsigned char *buf;
+ STRLEN         len;
 
  if (!(hint && SvOK(hint)))
   return 0;
 
- h = (const a_hint_t *) SvPVX(hint);
+ buf = SvPVX(hint);
+ A_DECODE_UV(requires_max, buf);
 
- {
-  const PERL_SI *si;
-  I32            requires = 0;
+ for (si = PL_curstackinfo; si; si = si->si_prev) {
+  I32 cxix;
 
-  for (si = PL_curstackinfo; si; si = si->si_prev) {
-   I32 cxix;
+  for (cxix = si->si_cxix; cxix >= 0; --cxix) {
+   const PERL_CONTEXT *cx = si->si_cxstack + cxix;
 
-   for (cxix = si->si_cxix; cxix >= 0; --cxix) {
-    const PERL_CONTEXT *cx = si->si_cxstack + cxix;
-
-    if (CxTYPE(cx) == CXt_EVAL && cx->blk_eval.old_op_type == OP_REQUIRE
-                               && ++requires > h->requires)
-     return 0;
-   }
+   if (CxTYPE(cx) == CXt_EVAL && cx->blk_eval.old_op_type == OP_REQUIRE
+                              && ++requires > requires_max)
+    return 0;
   }
  }
 
- return h->bits;
+ A_DECODE_UV(bits, buf + sizeof(UV));
+
+ return bits;
 }
 
 #else /* A_WORKAROUND_REQUIRE_PROPAGATION */

@@ -3,8 +3,6 @@ package autovivification::TestRequired2;
 no autovivification;
 
 BEGIN {
-# use autovivification "delete";
- use autovivification;
  delete $INC{'autovivification/TestRequired1.pm'};
 }
 
