@@ -183,7 +183,10 @@ STATIC const a_op_info *a_map_fetch(const OP *o, a_op_info *oi) {
 #endif
 
  val = ptable_fetch(a_op_map, o);
- *oi = *val;
+ if (val) {
+  *oi = *val;
+  val = oi;
+ }
 
 #ifdef USE_ITHREADS
  MUTEX_UNLOCK(&a_op_map_mutex);
@@ -494,16 +497,41 @@ STATIC OP *(*a_old_ck_rv2sv)(pTHX_ OP *) = 0;
 
 STATIC OP *a_ck_deref(pTHX_ OP *o) {
  OP * (*old_ck)(pTHX_ OP *o) = 0;
- UV hint;
+ UV hint = a_hint();
 
  switch (o->op_type) {
-  case OP_AELEM: old_ck = a_old_ck_aelem; break;
-  case OP_HELEM: old_ck = a_old_ck_helem; break;
-  case OP_RV2SV: old_ck = a_old_ck_rv2sv; break;
+  case OP_AELEM:
+   old_ck = a_old_ck_aelem;
+   if ((hint & A_HINT_DO) && !(hint & A_HINT_STRICT)) {
+    OP *kid = cUNOPo->op_first;
+    a_op_info oi;
+    if (kid->op_type == OP_RV2AV && kid->op_ppaddr != a_pp_rv2av
+                                 && kUNOP->op_first->op_type != OP_GV
+                                 && a_map_fetch(kid, &oi)) {
+     a_map_store(kid, kid->op_ppaddr, hint);
+     kid->op_ppaddr = a_pp_rv2av;
+    }
+   }
+   break;
+  case OP_HELEM:
+   old_ck = a_old_ck_helem;
+   if ((hint & A_HINT_DO) && !(hint & A_HINT_STRICT)) {
+    OP *kid = cUNOPo->op_first;
+    a_op_info oi;
+    if (kid->op_type == OP_RV2HV && kid->op_ppaddr != a_pp_rv2hv
+                                 && kUNOP->op_first->op_type != OP_GV
+                                 && a_map_fetch(kid, &oi)) {
+     a_map_store(kid, kid->op_ppaddr, hint);
+     kid->op_ppaddr = a_pp_rv2hv;
+    }
+   }
+   break;
+  case OP_RV2SV:
+   old_ck = a_old_ck_rv2sv;
+   break;
  }
  o = CALL_FPTR(old_ck)(aTHX_ o);
 
- hint = a_hint();
  if (hint & A_HINT_DO) {
   a_map_store(o, o->op_ppaddr, hint);
   o->op_ppaddr = a_pp_deref;

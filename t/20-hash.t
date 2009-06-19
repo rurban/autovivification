@@ -3,7 +3,7 @@
 use strict;
 use warnings;
 
-use Test::More tests => 6 * 3 * 274;
+use Test::More tests => 9 * 3 * 274;
 
 use lib 't/lib';
 use autovivification::TestCases;

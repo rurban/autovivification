@@ -62,6 +62,10 @@ sub testcase_ok {
  }
  my @base = ([ $var, $init, $code, $exp, $use ]);
  if ($var =~ /\$/) {
+  my @oldderef = @{$base[0]};
+  $oldderef[2] =~ s/\Q$var\E\->/\$$var/g;
+  push @base, \@oldderef;
+
   my @nonref = @{$base[0]};
   $nonref[0] =~ s/^\$/$sigil/;
   for ($nonref[1], $nonref[2]) {
