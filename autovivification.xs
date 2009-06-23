@@ -109,7 +109,8 @@ STATIC UV a_detag(pTHX_ const SV *hint) {
 #define A_HINT_MASK   (A_HINT_NOTIFY|A_HINT_DO)
 
 /* Only used in op flags */
-#define A_HINT_DEREF  64
+#define A_HINT_ROOT   64
+#define A_HINT_DEREF  128
 
 STATIC U32 a_hash = 0;
 
@@ -135,8 +136,8 @@ STATIC UV a_hint(pTHX) {
 
 typedef struct {
  OP *(*old_pp)(pTHX);
- const OP *root;
  UV flags;
+ void *next;
 } a_op_info;
 
 #define PTABLE_NAME        ptable_map
@@ -152,28 +153,6 @@ STATIC ptable *a_op_map = NULL;
 #ifdef USE_ITHREADS
 STATIC perl_mutex a_op_map_mutex;
 #endif
-
-STATIC void a_map_store(pPTBLMS_ const OP *o, OP *(*old_pp)(pTHX), UV flags) {
-#define a_map_store(O, PP, F) a_map_store(aPTBLMS_ (O), (PP), (F))
- a_op_info *oi;
-
-#ifdef USE_ITHREADS
- MUTEX_LOCK(&a_op_map_mutex);
-#endif
-
- if (!(oi = ptable_fetch(a_op_map, o))) {
-  oi = PerlMemShared_malloc(sizeof *oi);
-  ptable_map_store(a_op_map, o, oi);
- }
-
- oi->old_pp = old_pp;
- oi->root   = NULL;
- oi->flags  = flags;
-
-#ifdef USE_ITHREADS
- MUTEX_UNLOCK(&a_op_map_mutex);
-#endif
-}
 
 STATIC const a_op_info *a_map_fetch(const OP *o, a_op_info *oi) {
  const a_op_info *val;
@@ -195,6 +174,36 @@ STATIC const a_op_info *a_map_fetch(const OP *o, a_op_info *oi) {
  return val;
 }
 
+STATIC const a_op_info *a_map_store_locked(pPTBLMS_ const OP *o, OP *(*old_pp)(pTHX), void *next, UV flags) {
+#define a_map_store_locked(O, PP, N, F) a_map_store_locked(aPTBLMS_ (O), (PP), (N), (F))
+ a_op_info *oi;
+
+ if (!(oi = ptable_fetch(a_op_map, o))) {
+  oi = PerlMemShared_malloc(sizeof *oi);
+  ptable_map_store(a_op_map, o, oi);
+ }
+
+ oi->old_pp = old_pp;
+ oi->next   = next;
+ oi->flags  = flags;
+
+ return oi;
+}
+
+STATIC void a_map_store(pPTBLMS_ const OP *o, OP *(*old_pp)(pTHX), void *next, UV flags) {
+#define a_map_store(O, PP, N, F) a_map_store(aPTBLMS_ (O), (PP), (N), (F))
+
+#ifdef USE_ITHREADS
+ MUTEX_LOCK(&a_op_map_mutex);
+#endif
+
+ a_map_store_locked(o, old_pp, next, flags);
+
+#ifdef USE_ITHREADS
+ MUTEX_UNLOCK(&a_op_map_mutex);
+#endif
+}
+
 STATIC void a_map_delete(pTHX_ const OP *o) {
 #define a_map_delete(O) a_map_delete(aTHX_ (O))
 #ifdef USE_ITHREADS
@@ -208,7 +217,24 @@ STATIC void a_map_delete(pTHX_ const OP *o) {
 #endif
 }
 
-STATIC void a_map_set_root(const OP *root, UV flags) {
+STATIC const OP *a_map_descend(const OP *o) {
+ switch (PL_opargs[o->op_type] & OA_CLASS_MASK) {
+  case OA_BASEOP:
+  case OA_UNOP:
+  case OA_BINOP:
+  case OA_BASEOP_OR_UNOP:
+   return cUNOPo->op_first;
+  case OA_LIST:
+  case OA_LISTOP:
+   return cLISTOPo->op_last;
+ }
+
+ return NULL;
+}
+
+STATIC void a_map_store_root(pPTBLMS_ const OP *root, OP *(*old_pp)(pTHX), UV flags) {
+#define a_map_store_root(R, PP, F) a_map_store_root(aPTBLMS_ (R), (PP), (F))
+ const a_op_info *roi;
  a_op_info *oi;
  const OP *o = root;
 
@@ -216,35 +242,110 @@ STATIC void a_map_set_root(const OP *root, UV flags) {
  MUTEX_LOCK(&a_op_map_mutex);
 #endif
 
- while (o) {
-  if (oi = ptable_fetch(a_op_map, o)) {
-   oi->root  = root;
-   oi->flags = flags;
-  }
-  if (!(o->op_flags & OPf_KIDS))
+ roi = a_map_store_locked(o, old_pp, (OP *) root, flags | A_HINT_ROOT);
+
+ while (o->op_flags & OPf_KIDS) {
+  o = a_map_descend(o);
+  if (!o)
    break;
-  switch (PL_opargs[o->op_type] & OA_CLASS_MASK) {
-   case OA_BASEOP:
-   case OA_UNOP:
-   case OA_BINOP:
-   case OA_BASEOP_OR_UNOP:
-    o = cUNOPo->op_first;
-    break;
-   case OA_LIST:
-   case OA_LISTOP:
-    o = cLISTOPo->op_last;
-    break;
-   default:
-    goto done;
+  if ((oi = ptable_fetch(a_op_map, o))) {
+   oi->flags &= ~A_HINT_ROOT;
+   oi->next   = (a_op_info *) roi;
+   break;
   }
  }
 
-done:
 #ifdef USE_ITHREADS
  MUTEX_UNLOCK(&a_op_map_mutex);
 #endif
 
  return;
+}
+
+STATIC void a_map_update_flags_topdown(const OP *root, UV flags) {
+ a_op_info *oi;
+ const OP *o = root;
+
+#ifdef USE_ITHREADS
+ MUTEX_LOCK(&a_op_map_mutex);
+#endif
+
+ flags &= ~A_HINT_ROOT;
+
+ do {
+  if ((oi = ptable_fetch(a_op_map, o)))
+   oi->flags = (oi->flags & A_HINT_ROOT) | flags;
+  if (!(o->op_flags & OPf_KIDS))
+   break;
+  o = a_map_descend(o);
+ } while (o);
+
+#ifdef USE_ITHREADS
+ MUTEX_UNLOCK(&a_op_map_mutex);
+#endif
+
+ return;
+}
+
+#define a_map_cancel(R) a_map_update_flags_topdown((R), 0)
+
+STATIC void a_map_update_flags_bottomup(const OP *o, UV flags, UV rflags) {
+ a_op_info *oi;
+
+#ifdef USE_ITHREADS
+ MUTEX_LOCK(&a_op_map_mutex);
+#endif
+
+ flags  &= ~A_HINT_ROOT;
+ rflags |=  A_HINT_ROOT;
+
+ oi = ptable_fetch(a_op_map, o);
+ while (!(oi->flags & A_HINT_ROOT)) {
+  oi->flags = flags;
+  oi        = oi->next;
+ }
+ oi->flags = rflags;
+
+#ifdef USE_ITHREADS
+ MUTEX_UNLOCK(&a_op_map_mutex);
+#endif
+
+ return;
+}
+
+/* ... Decide whether this expression should be autovivified or not ........ */
+
+STATIC UV a_map_resolve(const OP *o, a_op_info *oi) {
+ UV flags = 0, rflags;
+ const OP *root;
+ a_op_info *roi = oi;
+
+ while (!(roi->flags & A_HINT_ROOT))
+  roi = roi->next;
+ if (!roi)
+  goto cancel;
+
+ rflags = roi->flags & ~A_HINT_ROOT;
+ if (!rflags)
+  goto cancel;
+
+ root = roi->next;
+ if (root->op_flags & OPf_MOD) {
+  if (rflags & A_HINT_STORE)
+   flags = (A_HINT_STORE|A_HINT_DEREF);
+ } else if (rflags & A_HINT_FETCH)
+   flags = (A_HINT_FETCH|A_HINT_DEREF);
+
+ if (!flags) {
+cancel:
+  a_map_update_flags_bottomup(o, 0, 0);
+  return 0;
+ }
+
+ flags |= (rflags & A_HINT_NOTIFY);
+ a_map_update_flags_bottomup(o, flags, 0);
+
+ return oi->flags & A_HINT_ROOT ? 0 : flags;
 }
 
 /* ... Lightweight pp_defined() ............................................ */
@@ -273,25 +374,34 @@ STATIC bool a_defined(pTHX_ SV *sv) {
 
 /* --- PP functions -------------------------------------------------------- */
 
+/* Be aware that we restore PL_op->op_ppaddr from the pointer table old_pp
+ * value, another extension might have saved our pp replacement as the ppaddr
+ * for this op, so this doesn't ensure that our function will never be called
+ * again. That's why we don't remove the op info from our map, so that it can
+ * still run correctly if required. */
+
 /* ... pp_rv2av ............................................................ */
 
 STATIC OP *a_pp_rv2av(pTHX) {
  a_op_info oi;
- UV hint;
+ UV flags;
  dSP;
 
  a_map_fetch(PL_op, &oi);
+ flags = oi.flags;
 
- if (PL_op == oi.root) { /* This means "@$arrayref" */
+ if (flags & A_HINT_DEREF) {
+  if (!SvOK(TOPs)) {
+   /* We always need to push an empty array to fool the pp_aelem() that comes
+    * later. */
+   SV *av;
+   POPs;
+   av = sv_2mortal((SV *) newAV());
+   PUSHs(av);
+   RETURN;
+  }
+ } else {
   PL_op->op_ppaddr = oi.old_pp;
- } else if (!SvOK(TOPs)) {
-  /* We always need to push an empty array to fool the pp_aelem() that comes
-   * later. */
-  SV *av;
-  POPs;
-  av = sv_2mortal((SV *) newAV());
-  PUSHs(av);
-  RETURN;
  }
 
  return CALL_FPTR(oi.old_pp)(aTHX);
@@ -301,15 +411,17 @@ STATIC OP *a_pp_rv2av(pTHX) {
 
 STATIC OP *a_pp_rv2hv(pTHX) {
  a_op_info oi;
- UV hint;
+ UV flags;
  dSP;
 
  a_map_fetch(PL_op, &oi);
+ flags = oi.flags;
 
- if (PL_op == oi.root) { /* This means "%$hashref" */
+ if (flags & A_HINT_DEREF) {
+  if (!SvOK(TOPs))
+   RETURN;
+ } else {
   PL_op->op_ppaddr = oi.old_pp;
- } else if (!SvOK(TOPs)) {
-  RETURN;
  }
 
  return CALL_FPTR(oi.old_pp)(aTHX);
@@ -348,33 +460,20 @@ deref:
   }
 
   return o;
- } else if (flags && (PL_op->op_private & OPpDEREF || PL_op == oi.root)) {
-  oi.flags = flags & A_HINT_NOTIFY;
+ } else if ((flags & ~A_HINT_ROOT)
+                    && (PL_op->op_private & OPpDEREF || flags & A_HINT_ROOT)) {
+  /* Decide if the expression must autovivify or not.
+   * This branch should be called only once by expression. */
+  flags = a_map_resolve(PL_op, &oi);
 
-  if (oi.root->op_flags & OPf_MOD) {
-   if (flags & A_HINT_STORE)
-    oi.flags |= (A_HINT_STORE|A_HINT_DEREF);
-  } else if (flags & A_HINT_FETCH)
-    oi.flags |= (A_HINT_FETCH|A_HINT_DEREF);
-
-  if (PL_op == oi.root)
-   oi.flags &= ~A_HINT_DEREF;
-
-  /* We will need the updated flags value in the deref part */
-  flags = oi.flags;
-
+  /* We need the updated flags value in the deref branch. */
   if (flags & A_HINT_DEREF)
    goto deref;
-
-  /* This op doesn't need to skip autovivification, so restore the original
-   * state. Be aware that another extension might have saved a_pp_deref as the
-   * ppaddr for this op, so restoring PL_op->op_ppaddr doesn't ensure that this
-   * function will never be called again. That's why we don't remove the op info
-   * from our map and we reset oi.flags to 0, so that it can still run correctly
-   * if required. */
-  oi.flags = 0;
-  PL_op->op_ppaddr = oi.old_pp;
  }
+
+ /* This op doesn't need to skip autovivification, so restore the original
+  * state. */
+ PL_op->op_ppaddr = oi.old_pp;
 
  return CALL_FPTR(oi.old_pp)(aTHX);
 }
@@ -463,7 +562,7 @@ STATIC OP *a_ck_padany(pTHX_ OP *o) {
  hint = a_hint();
  if (hint & A_HINT_DO) {
   a_pp_padsv_save();
-  a_map_store(o, a_pp_padsv_saved, hint);
+  a_map_store_root(o, a_pp_padsv_saved, hint);
  } else
   a_map_delete(o);
 
@@ -481,7 +580,7 @@ STATIC OP *a_ck_padsv(pTHX_ OP *o) {
 
  hint = a_hint();
  if (hint & A_HINT_DO) {
-  a_map_store(o, o->op_ppaddr, hint);
+  a_map_store_root(o, o->op_ppaddr, hint);
   o->op_ppaddr = a_pp_deref;
  } else
   a_map_delete(o);
@@ -490,6 +589,11 @@ STATIC OP *a_ck_padsv(pTHX_ OP *o) {
 }
 
 /* ... ck_deref (aelem,helem,rv2sv) ........................................ */
+
+/* Those ops appear both at the root and inside an expression but there's no
+ * way to distinguish both situations. Worse, we can't even know if we are in a
+ * modifying context, so the expression can't be resolved yet. It will be at the
+ * first invocation of a_pp_deref() for this expression. */
 
 STATIC OP *(*a_old_ck_aelem)(pTHX_ OP *) = 0;
 STATIC OP *(*a_old_ck_helem)(pTHX_ OP *) = 0;
@@ -508,7 +612,7 @@ STATIC OP *a_ck_deref(pTHX_ OP *o) {
     if (kid->op_type == OP_RV2AV && kid->op_ppaddr != a_pp_rv2av
                                  && kUNOP->op_first->op_type != OP_GV
                                  && a_map_fetch(kid, &oi)) {
-     a_map_store(kid, kid->op_ppaddr, hint);
+     a_map_store(kid, kid->op_ppaddr, o, hint);
      kid->op_ppaddr = a_pp_rv2av;
     }
    }
@@ -521,7 +625,7 @@ STATIC OP *a_ck_deref(pTHX_ OP *o) {
     if (kid->op_type == OP_RV2HV && kid->op_ppaddr != a_pp_rv2hv
                                  && kUNOP->op_first->op_type != OP_GV
                                  && a_map_fetch(kid, &oi)) {
-     a_map_store(kid, kid->op_ppaddr, hint);
+     a_map_store(kid, kid->op_ppaddr, o, hint);
      kid->op_ppaddr = a_pp_rv2hv;
     }
    }
@@ -533,9 +637,8 @@ STATIC OP *a_ck_deref(pTHX_ OP *o) {
  o = CALL_FPTR(old_ck)(aTHX_ o);
 
  if (hint & A_HINT_DO) {
-  a_map_store(o, o->op_ppaddr, hint);
+  a_map_store_root(o, o->op_ppaddr, hint);
   o->op_ppaddr = a_pp_deref;
-  a_map_set_root(o, hint);
  } else
   a_map_delete(o);
 
@@ -543,6 +646,11 @@ STATIC OP *a_ck_deref(pTHX_ OP *o) {
 }
 
 /* ... ck_rv2xv (rv2av,rv2hv) .............................................. */
+
+/* Those ops also appear both inisde and at the root, hence the caveats for
+ * a_ck_deref() still apply here. Since a padsv/rv2sv must appear before a
+ * rv2[ah]v, resolution is handled by the first call to a_pp_deref() in the
+ * expression. */
 
 STATIC OP *(*a_old_ck_rv2av)(pTHX_ OP *) = 0;
 STATIC OP *(*a_old_ck_rv2hv)(pTHX_ OP *) = 0;
@@ -562,12 +670,9 @@ STATIC OP *a_ck_rv2xv(pTHX_ OP *o) {
   return o;
 
  hint = a_hint();
- if (hint & A_HINT_DO) {
-  if (!(hint & A_HINT_STRICT)) {
-   a_map_store(o, o->op_ppaddr, hint);
-   o->op_ppaddr = new_pp;
-  }
-  a_map_set_root(o, hint);
+ if (hint & A_HINT_DO && !(hint & A_HINT_STRICT)) {
+  a_map_store_root(o, o->op_ppaddr, hint);
+  o->op_ppaddr = new_pp;
  } else
   a_map_delete(o);
 
@@ -575,6 +680,9 @@ STATIC OP *a_ck_rv2xv(pTHX_ OP *o) {
 }
 
 /* ... ck_root (exists,delete,keys,values) ................................. */
+
+/* Those ops are only found at the root of a dereferencing expression. We can
+ * then resolve at compile time if vivification must take place or not. */
 
 STATIC OP *(*a_old_ck_exists)(pTHX_ OP *) = 0;
 STATIC OP *(*a_old_ck_delete)(pTHX_ OP *) = 0;
@@ -613,11 +721,11 @@ STATIC OP *a_ck_root(pTHX_ OP *o) {
 
  if (hint & A_HINT_DO) {
   if (enabled) {
-   a_map_set_root(o, hint | A_HINT_DEREF);
-   a_map_store(o, o->op_ppaddr, hint);
+   a_map_update_flags_topdown(o, hint | A_HINT_DEREF);
+   a_map_store_root(o, o->op_ppaddr, hint);
    o->op_ppaddr = new_pp;
   } else {
-   a_map_set_root(o, 0);
+   a_map_cancel(o);
   }
  } else
   a_map_delete(o);
