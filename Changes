@@ -1,5 +1,17 @@
 Revision history for autovivification
 
+0.03    2009-06-23 22:20 UTC
+        + Add : Handle old-fashion dereferencing (like $$hashref{key}).
+        + Chg : Aliasing constructs (for ($x{foo}) { ... }) are now covered by
+                the 'store' category (and no longer the 'fetch' one). This is
+                because there's no way to know at compile-time if the alias
+                will be assigned to.
+        + Fix : Quadratic complexity at compile-time.
+        + Fix : Segfaults when dereferencing globals.
+        + Fix : Segfaults on big-endian systems.
+        + Tst : Really test plain arrays and hashes.
+        + Tst : Improved coverage.
+
 0.02    2009-06-17 18:05 UTC
         + Add : 'fetch' also applies to aliasing ("for ($hashref->{key}) { }").
         + Fix : Don't segfault on "keys/values %$hashref", and don't vivify if

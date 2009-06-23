@@ -2,7 +2,7 @@ NAME
     autovivification - Lexically disable autovivification.
 
 VERSION
-    Version 0.02
+    Version 0.03
 
 SYNOPSIS
         no autovivification;
@@ -62,8 +62,9 @@ METHODS
     *   'store'
 
         Turn off autovivification for lvalue dereferencing expressions, such
-        as "$hashref->{key}[$idx]{$field} = $value". An exception is thrown
-        if vivification is needed to store the value, which means that
+        as "$hashref->{key}[$idx]{$field} = $value" or "for
+        ($hashref->{key}[$idx]{$field}) { ... }". An exception is thrown if
+        vivification is needed to store the value, which means that
         effectively you can only assign to levels that are already defined
         (in the example, this would require "$hashref->{key}[$idx]" to
         already be a hash reference).
