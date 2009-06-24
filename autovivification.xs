@@ -409,7 +409,7 @@ STATIC OP *a_pp_rv2av(pTHX) {
 
 /* ... pp_rv2hv ............................................................ */
 
-STATIC OP *a_pp_rv2hv(pTHX) {
+STATIC OP *a_pp_rv2hv_simple(pTHX) {
  a_op_info oi;
  UV flags;
  dSP;
@@ -420,6 +420,29 @@ STATIC OP *a_pp_rv2hv(pTHX) {
  if (flags & A_HINT_DEREF) {
   if (!SvOK(TOPs))
    RETURN;
+ } else {
+  PL_op->op_ppaddr = oi.old_pp;
+ }
+
+ return CALL_FPTR(oi.old_pp)(aTHX);
+}
+
+STATIC OP *a_pp_rv2hv(pTHX) {
+ a_op_info oi;
+ UV flags;
+ dSP;
+
+ a_map_fetch(PL_op, &oi);
+ flags = oi.flags;
+
+ if (flags & A_HINT_DEREF) {
+  if (!SvOK(TOPs)) {
+   SV *hv;
+   POPs;
+   hv = sv_2mortal((SV *) newHV());
+   PUSHs(hv);
+   RETURN;
+  }
  } else {
   PL_op->op_ppaddr = oi.old_pp;
  }
@@ -626,7 +649,7 @@ STATIC OP *a_ck_deref(pTHX_ OP *o) {
   case OP_HELEM:
    old_ck = a_old_ck_helem;
    if ((hint & A_HINT_DO) && !(hint & A_HINT_STRICT))
-    a_recheck_rv2xv(cUNOPo->op_first, OP_RV2HV, a_pp_rv2hv);
+    a_recheck_rv2xv(cUNOPo->op_first, OP_RV2HV, a_pp_rv2hv_simple);
    break;
   case OP_RV2SV:
    old_ck = a_old_ck_rv2sv;
@@ -660,7 +683,7 @@ STATIC OP *a_ck_rv2xv(pTHX_ OP *o) {
 
  switch (o->op_type) {
   case OP_RV2AV: old_ck = a_old_ck_rv2av; new_pp = a_pp_rv2av; break;
-  case OP_RV2HV: old_ck = a_old_ck_rv2hv; new_pp = a_pp_rv2hv; break;
+  case OP_RV2HV: old_ck = a_old_ck_rv2hv; new_pp = a_pp_rv2hv_simple; break;
  }
  o = CALL_FPTR(old_ck)(aTHX_ o);
 
@@ -671,6 +694,40 @@ STATIC OP *a_ck_rv2xv(pTHX_ OP *o) {
  if (hint & A_HINT_DO && !(hint & A_HINT_STRICT)) {
   a_map_store_root(o, o->op_ppaddr, hint);
   o->op_ppaddr = new_pp;
+ } else
+  a_map_delete(o);
+
+ return o;
+}
+
+/* ... ck_xslice (aslice,hslice) ........................................... */
+
+/* I think those are only found at the root, but there's nothing that really
+ * prevent them to be inside the expression too. We only need to update the
+ * root so that the rest of the expression will see the right context when
+ * resolving. That's why we don't replace the ppaddr. */
+
+STATIC OP *(*a_old_ck_aslice)(pTHX_ OP *) = 0;
+STATIC OP *(*a_old_ck_hslice)(pTHX_ OP *) = 0;
+
+STATIC OP *a_ck_xslice(pTHX_ OP *o) {
+ OP * (*old_ck)(pTHX_ OP *o) = 0;
+ UV hint = a_hint();
+
+ switch (o->op_type) {
+  case OP_ASLICE:
+   old_ck = a_old_ck_aslice;
+   break;
+  case OP_HSLICE:
+   old_ck = a_old_ck_hslice;
+   if (hint & A_HINT_DO)
+    a_recheck_rv2xv(cUNOPo->op_first->op_sibling, OP_RV2HV, a_pp_rv2hv);
+   break;
+ }
+ o = CALL_FPTR(old_ck)(aTHX_ o);
+
+ if (hint & A_HINT_DO) {
+  a_map_store_root(o, 0, hint);
  } else
   a_map_delete(o);
 
@@ -767,6 +824,11 @@ BOOT:
   PL_check[OP_RV2AV]  = MEMBER_TO_FPTR(a_ck_rv2xv);
   a_old_ck_rv2hv      = PL_check[OP_RV2HV];
   PL_check[OP_RV2HV]  = MEMBER_TO_FPTR(a_ck_rv2xv);
+
+  a_old_ck_aslice     = PL_check[OP_ASLICE];
+  PL_check[OP_ASLICE] = MEMBER_TO_FPTR(a_ck_xslice);
+  a_old_ck_hslice     = PL_check[OP_HSLICE];
+  PL_check[OP_HSLICE] = MEMBER_TO_FPTR(a_ck_xslice);
 
   a_old_ck_exists     = PL_check[OP_EXISTS];
   PL_check[OP_EXISTS] = MEMBER_TO_FPTR(a_ck_root);

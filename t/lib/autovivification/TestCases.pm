@@ -41,9 +41,11 @@ TESTCASE
 sub testcase_ok {
  local $_  = shift;
  my $sigil = shift;
+
  my @chunks = split /#+/, "$_ ";
  s/^\s+//, s/\s+$// for @chunks;
  my ($init, $code, $exp, $opts) = @chunks;
+
  (my $var = $init) =~ s/[^\$@%\w].*//;
  $init = $var eq $init ? '' : "$init;";
  my $use;
@@ -60,15 +62,19 @@ sub testcase_ok {
   $opts = 'default';
   $use  = '';
  }
+
  my @base = ([ $var, $init, $code, $exp, $use ]);
  if ($var =~ /\$/) {
+  my ($name) = $var =~ /^\$(.*)/;
+
   my @oldderef = @{$base[0]};
   $oldderef[2] =~ s/\Q$var\E\->/\$$var/g;
   push @base, \@oldderef;
 
   my @nonref = @{$base[0]};
-  $nonref[0] =~ s/^\$/$sigil/;
+  $nonref[0] = $sigil . $name;
   for ($nonref[1], $nonref[2]) {
+   s/\@\Q$var\E([\[\{])/\@$name$1/g;
    s/\Q$sigil$var\E/$nonref[0]/g;
    s/\Q$var\E\->/$var/g;
   }
@@ -87,12 +93,14 @@ sub testcase_ok {
   $nonref[3] =~ s/,\s*undef\s*$/, $empty/;
   push @base, \@nonref;
  }
+
  my @testcases = map {
   my ($var, $init, $code, $exp, $use) = @$_;
   [ $var, $init,               $code, $exp, $use, $opts, 0 ],
   [ $var, "use strict; $init", $code, $exp, $use, $opts, 1 ],
   [ $var, "no strict;  $init", $code, $exp, $use, $opts, 1 ],
  } @base;
+
  for (@testcases) {
   my ($testcase, $desc) = generate(@$_);
   my @N = (0 .. 9);

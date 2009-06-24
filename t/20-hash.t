@@ -3,7 +3,7 @@
 use strict;
 use warnings;
 
-use Test::More tests => 9 * 3 * 274;
+use Test::More tests => 9 * 3 * 290;
 
 use lib 't/lib';
 use autovivification::TestCases;
@@ -129,6 +129,28 @@ $x->{a} = 1 # my @a = %$x; () # '', undef, { a => 1 } # +fetch
 $x->{a} = 1 # my @a = %$x; () # '', undef, { a => 1 } # +exists
 $x->{a} = 1 # my @a = %$x; () # '', undef, { a => 1 } # +delete
 $x->{a} = 1 # my @a = %$x; () # '', undef, { a => 1 } # +store
+
+--- slice ---
+
+$x # my @a = @$x{'a', 'b'}; \@a # '', [ undef, undef ], { }
+$x # my @a = @$x{'a', 'b'}; \@a # '', [ undef, undef ], undef #
+$x # my @a = @$x{'a', 'b'}; \@a # '', [ undef, undef ], undef # +fetch
+$x # my @a = @$x{'a', 'b'}; \@a # '', [ undef, undef ], { }   # +exists
+$x # my @a = @$x{'a', 'b'}; \@a # '', [ undef, undef ], { }   # +delete
+$x # my @a = @$x{'a', 'b'}; \@a # '', [ undef, undef ], { }   # +store
+
+$x->{b} = 0 # my @a = @$x{'a', 'b'}; \@a # '', [ undef, 0 ], { b => 0 } # +fetch
+
+$x # @$x{'a', 'b'} = (1, 2); () # '', undef, { a => 1, b => 2 }
+$x # @$x{'a', 'b'} = (1, 2); () # '', undef, { a => 1, b => 2 } #
+$x # @$x{'a', 'b'} = (1, 2); () # '', undef, { a => 1, b => 2 } # +fetch
+$x # @$x{'a', 'b'} = (1, 2); () # '', undef, { a => 1, b => 2 } # +exists
+$x # @$x{'a', 'b'} = (1, 2); () # '', undef, { a => 1, b => 2 } # +delete
+$x # @$x{'a', 'b'} = (1, 2); () # qr/^Can't vivify reference/, undef, undef # +store
+
+$x->{a} = 0              # @$x{'a', 'b'} = (1, 2); () # '', undef, { a => 1, b => 2 } # +store
+$x->{c} = 0              # @$x{'a', 'b'} = (1, 2); () # '', undef, { a => 1, b => 2, c => 0 } # +store
+$x->{a} = 0, $x->{b} = 0 # @$x{'a', 'b'} = (1, 2); () # '', undef, { a => 1, b => 2 } # +store
 
 --- exists ---
 

@@ -3,7 +3,7 @@
 use strict;
 use warnings;
 
-use Test::More tests => 9 * 3 * 274;
+use Test::More tests => 9 * 3 * 290;
 
 use lib 't/lib';
 use autovivification::TestCases;
@@ -129,6 +129,28 @@ $x->[$N[0]] = 1 # my @a = @$x; () # '', undef, [ 1 ] # +fetch
 $x->[$N[0]] = 1 # my @a = @$x; () # '', undef, [ 1 ] # +exists
 $x->[$N[0]] = 1 # my @a = @$x; () # '', undef, [ 1 ] # +delete
 $x->[$N[0]] = 1 # my @a = @$x; () # '', undef, [ 1 ] # +store
+
+--- slice ---
+
+$x # my @a = @$x[$N[0], $N[1]]; \@a # '', [ undef, undef ], [ ]
+$x # my @a = @$x[$N[0], $N[1]]; \@a # '', [ undef, undef ], undef #
+$x # my @a = @$x[$N[0], $N[1]]; \@a # '', [ undef, undef ], undef # +fetch
+$x # my @a = @$x[$N[0], $N[1]]; \@a # '', [ undef, undef ], [ ] # +exists
+$x # my @a = @$x[$N[0], $N[1]]; \@a # '', [ undef, undef ], [ ] # +delete
+$x # my @a = @$x[$N[0], $N[1]]; \@a # '', [ undef, undef ], [ ] # +store
+
+$x->[$N[1]] = 0 # my @a = @$x[$N[0], $N[1]]; \@a # '', [ undef, 0 ], [ undef, 0 ] # +fetch
+
+$x # @$x[$N[0], $N[1]] = (1, 2); () # '', undef, [ 1, 2 ]
+$x # @$x[$N[0], $N[1]] = (1, 2); () # '', undef, [ 1, 2 ] #
+$x # @$x[$N[0], $N[1]] = (1, 2); () # '', undef, [ 1, 2 ] # +fetch
+$x # @$x[$N[0], $N[1]] = (1, 2); () # '', undef, [ 1, 2 ] # +exists
+$x # @$x[$N[0], $N[1]] = (1, 2); () # '', undef, [ 1, 2 ] # +delete
+$x # @$x[$N[0], $N[1]] = (1, 2); () # qr/^Can't vivify reference/, undef, undef # +store
+
+$x->[$N[0]] = 0 # @$x[$N[0], $N[1]] = (1, 2); () # '', undef, [ 1, 2 ] # +store
+$x->[$N[2]] = 0 # @$x[$N[0], $N[1]] = (1, 2); () # '', undef, [ 1, 2, 0 ] # +store
+$x->[$N[0]] = 0, $x->[$N[1]] = 0 # @$x[$N[0], $N[1]] = (1, 2); () # '', undef, [ 1, 2 ] # +store
 
 --- exists ---
 
