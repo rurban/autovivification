@@ -519,6 +519,20 @@ STATIC OP *a_pp_root_binop(pTHX) {
 
 /* --- Check functions ----------------------------------------------------- */
 
+STATIC void a_recheck_rv2xv(pTHX_ OP *o, OPCODE type, OP *(*new_pp)(pTHX)) {
+#define a_recheck_rv2xv(O, T, PP) a_recheck_rv2xv(aTHX_ (O), (T), (PP))
+ a_op_info oi;
+
+ if (o->op_type == type && o->op_ppaddr != new_pp
+                        && cUNOPo->op_first->op_type != OP_GV
+                        && a_map_fetch(o, &oi)) {
+  a_map_store(o, o->op_ppaddr, oi.next, oi.flags);
+  o->op_ppaddr = new_pp;
+ }
+
+ return;
+}
+
 /* ... ck_pad{any,sv} ...................................................... */
 
 /* Sadly, the PADSV OPs we are interested in don't trigger the padsv check
@@ -606,29 +620,13 @@ STATIC OP *a_ck_deref(pTHX_ OP *o) {
  switch (o->op_type) {
   case OP_AELEM:
    old_ck = a_old_ck_aelem;
-   if ((hint & A_HINT_DO) && !(hint & A_HINT_STRICT)) {
-    OP *kid = cUNOPo->op_first;
-    a_op_info oi;
-    if (kid->op_type == OP_RV2AV && kid->op_ppaddr != a_pp_rv2av
-                                 && kUNOP->op_first->op_type != OP_GV
-                                 && a_map_fetch(kid, &oi)) {
-     a_map_store(kid, kid->op_ppaddr, o, hint);
-     kid->op_ppaddr = a_pp_rv2av;
-    }
-   }
+   if ((hint & A_HINT_DO) && !(hint & A_HINT_STRICT))
+    a_recheck_rv2xv(cUNOPo->op_first, OP_RV2AV, a_pp_rv2av);
    break;
   case OP_HELEM:
    old_ck = a_old_ck_helem;
-   if ((hint & A_HINT_DO) && !(hint & A_HINT_STRICT)) {
-    OP *kid = cUNOPo->op_first;
-    a_op_info oi;
-    if (kid->op_type == OP_RV2HV && kid->op_ppaddr != a_pp_rv2hv
-                                 && kUNOP->op_first->op_type != OP_GV
-                                 && a_map_fetch(kid, &oi)) {
-     a_map_store(kid, kid->op_ppaddr, o, hint);
-     kid->op_ppaddr = a_pp_rv2hv;
-    }
-   }
+   if ((hint & A_HINT_DO) && !(hint & A_HINT_STRICT))
+    a_recheck_rv2xv(cUNOPo->op_first, OP_RV2HV, a_pp_rv2hv);
    break;
   case OP_RV2SV:
    old_ck = a_old_ck_rv2sv;
