@@ -33,13 +33,10 @@
  while (len > 0)                 \
   (U) = ((U) << 8) | (B)[--len];
 
-STATIC SV *a_tag(pTHX_ UV bits) {
-#define a_tag(B) a_tag(aTHX_ (B))
- SV            *hint;
+#if A_WORKAROUND_REQUIRE_PROPAGATION
+STATIC UV a_require_tag(pTHX) {
+#define a_require_tag() a_require_tag(aTHX)
  const PERL_SI *si;
- UV             requires = 0;
- unsigned char  buf[sizeof(UV) * 2];
- STRLEN         len;
 
  for (si = PL_curstackinfo; si; si = si->si_prev) {
   I32 cxix;
@@ -48,11 +45,24 @@ STATIC SV *a_tag(pTHX_ UV bits) {
    const PERL_CONTEXT *cx = si->si_cxstack + cxix;
 
    if (CxTYPE(cx) == CXt_EVAL && cx->blk_eval.old_op_type == OP_REQUIRE)
-    ++requires;
+    return PTR2UV(cx);
   }
  }
 
- A_ENCODE_UV(buf,              requires);
+ return PTR2UV(NULL);
+}
+#endif /* A_WORKAROUND_REQUIRE_PROPAGATION */
+
+STATIC SV *a_tag(pTHX_ UV bits) {
+#define a_tag(B) a_tag(aTHX_ (B))
+ SV            *hint;
+ const PERL_SI *si;
+ UV             cxreq;
+ unsigned char  buf[sizeof(UV) * 2];
+ STRLEN         len;
+
+ cxreq = a_require_tag();
+ A_ENCODE_UV(buf,              cxreq);
  A_ENCODE_UV(buf + sizeof(UV), bits);
  hint = newSVpvn(buf, sizeof buf);
  SvREADONLY_on(hint);
@@ -63,7 +73,7 @@ STATIC SV *a_tag(pTHX_ UV bits) {
 STATIC UV a_detag(pTHX_ const SV *hint) {
 #define a_detag(H) a_detag(aTHX_ (H))
  const PERL_SI *si;
- UV             requires = 0, requires_max = 0, bits = 0;
+ UV             cxreq = 0, bits = 0;
  unsigned char *buf;
  STRLEN         len;
 
@@ -71,21 +81,12 @@ STATIC UV a_detag(pTHX_ const SV *hint) {
   return 0;
 
  buf = SvPVX(hint);
- A_DECODE_UV(requires_max, buf);
 
- for (si = PL_curstackinfo; si; si = si->si_prev) {
-  I32 cxix;
+ A_DECODE_UV(cxreq, buf);
+ if (a_require_tag() != cxreq)
+  return 0;
 
-  for (cxix = si->si_cxix; cxix >= 0; --cxix) {
-   const PERL_CONTEXT *cx = si->si_cxstack + cxix;
-
-   if (CxTYPE(cx) == CXt_EVAL && cx->blk_eval.old_op_type == OP_REQUIRE
-                              && ++requires > requires_max)
-    return 0;
-  }
- }
-
- A_DECODE_UV(bits, buf + sizeof(UV));
+ A_DECODE_UV(bits,  buf + sizeof(UV));
 
  return bits;
 }
