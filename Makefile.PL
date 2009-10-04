@@ -43,21 +43,21 @@ my %META = (
 );
 
 WriteMakefile(
-    NAME             => $name,
-    AUTHOR           => 'Vincent Pit <perl@profvince.com>',
-    LICENSE          => 'perl',
-    VERSION_FROM     => $file,
-    ABSTRACT_FROM    => $file,
-    PL_FILES         => {},
-    @DEFINES,
-    PREREQ_PM        => \%PREREQ_PM,
-    MIN_PERL_VERSION => 5.008,
-    META_MERGE       => \%META,
-    dist             => {
-        PREOP    => "pod2text $file > \$(DISTVNAME)/README",
-        COMPRESS => 'gzip -9f', SUFFIX => 'gz'
-    },
-    clean            => {
-        FILES => "$dist-* *.gcov *.gcda *.gcno cover_db Debian_CPANTS.txt"
-    },
+ NAME             => $name,
+ AUTHOR           => 'Vincent Pit <perl@profvince.com>',
+ LICENSE          => 'perl',
+ VERSION_FROM     => $file,
+ ABSTRACT_FROM    => $file,
+ PL_FILES         => {},
+ @DEFINES,
+ PREREQ_PM        => \%PREREQ_PM,
+ MIN_PERL_VERSION => 5.008,
+ META_MERGE       => \%META,
+ dist             => {
+  PREOP    => "pod2text $file > \$(DISTVNAME)/README",
+  COMPRESS => 'gzip -9f', SUFFIX => 'gz'
+ },
+ clean            => {
+  FILES => "$dist-* *.gcov *.gcda *.gcno cover_db Debian_CPANTS.txt"
+ },
 );
