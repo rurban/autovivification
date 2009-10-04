@@ -15,6 +15,11 @@ if ($^O eq 'MSWin32' && $^V lt v5.9.0) {
 
 my $dist = 'autovivification';
 
+(my $name = $dist) =~ s{-}{::}g;
+
+(my $file = $dist) =~ s{-}{/}g;
+$file = "lib/$file.pm";
+
 my %PREREQ_PM = (
  'XSLoader' => 0,
 );
@@ -38,18 +43,18 @@ my %META = (
 );
 
 WriteMakefile(
-    NAME             => 'autovivification',
+    NAME             => $name,
     AUTHOR           => 'Vincent Pit <perl@profvince.com>',
     LICENSE          => 'perl',
-    VERSION_FROM     => 'lib/autovivification.pm',
-    ABSTRACT_FROM    => 'lib/autovivification.pm',
+    VERSION_FROM     => $file,
+    ABSTRACT_FROM    => $file,
     PL_FILES         => {},
     @DEFINES,
     PREREQ_PM        => \%PREREQ_PM,
     MIN_PERL_VERSION => 5.008,
     META_MERGE       => \%META,
     dist             => {
-        PREOP    => 'pod2text lib/autovivification.pm > $(DISTVNAME)/README',
+        PREOP    => "pod2text $file > \$(DISTVNAME)/README",
         COMPRESS => 'gzip -9f', SUFFIX => 'gz'
     },
     clean            => {
