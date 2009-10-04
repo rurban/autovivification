@@ -15,6 +15,10 @@ if ($^O eq 'MSWin32' && $^V lt v5.9.0) {
 
 my $dist = 'autovivification';
 
+my %PREREQ_PM = (
+ 'XSLoader' => 0,
+);
+
 my %META = (
  configure_requires => {
   'ExtUtils::MakeMaker' => 0,
@@ -22,6 +26,7 @@ my %META = (
  build_requires => {
   'ExtUtils::MakeMaker' => 0,
   'Test::More'          => 0,
+  %PREREQ_PM,
  },
  dynamic_config => 1,
  resources => {
@@ -40,9 +45,7 @@ WriteMakefile(
     ABSTRACT_FROM    => 'lib/autovivification.pm',
     PL_FILES         => {},
     @DEFINES,
-    PREREQ_PM        => {
-        'XSLoader' => 0,
-    },
+    PREREQ_PM        => \%PREREQ_PM,
     MIN_PERL_VERSION => 5.008,
     META_MERGE       => \%META,
     dist             => {
