@@ -12,6 +12,7 @@ t/20-hash.t
 t/22-hash-kv.t
 t/30-array.t
 t/31-array-fast.t
+t/32-array-kv.t
 t/40-scope.t
 t/41-padsv.t
 t/91-pod.t

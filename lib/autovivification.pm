@@ -65,6 +65,7 @@ Enables the features given in C<@opts>, which can be :
 C<'fetch'>
 
 Turn off autovivification for rvalue dereferencing expressions, such as C<< $value = $hashref->{key}[$idx]{$field} >>, C<< keys %{$hashref->{key}} >> or C<< values %{$hashref->{key}} >>.
+Starting from perl C<5.11>, it also covers C<leys> and C<values> on array references.
 When the expression would have autovivified, C<undef> is returned for a plain fetch, while C<keys> and C<values> return C<0> in scalar context and the empty list in list context.
 
 =item *

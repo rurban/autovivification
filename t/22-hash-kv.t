@@ -3,7 +3,11 @@
 use strict;
 use warnings;
 
-use Test::More tests => 9 * 3 * 64;
+use Test::More;
+
+BEGIN {
+ plan tests => 9 * 3 * 64;
+}
 
 use lib 't/lib';
 use autovivification::TestCases;
@@ -35,10 +39,10 @@ $x # [ keys %$x ] # '', [ ], undef #
 $x # [ keys %$x ] # '', [ ], undef # +fetch
 $x # [ keys %$x ] # '', [ ], { }   # +exists +delete +store
 
-$x->{a} ='b' # [ keys %$x ] # '', [ 'a' ], { a => 'b' }
-$x->{a} ='b' # [ keys %$x ] # '', [ 'a' ], { a => 'b' } #
-$x->{a} ='b' # [ keys %$x ] # '', [ 'a' ], { a => 'b' } # +fetch
-$x->{a} ='b' # [ keys %$x ] # '', [ 'a' ], { a => 'b' } # +exists +delete +store
+$x->{a} = 1 # [ keys %$x ] # '', [ 'a' ], { a => 1 }
+$x->{a} = 1 # [ keys %$x ] # '', [ 'a' ], { a => 1 } #
+$x->{a} = 1 # [ keys %$x ] # '', [ 'a' ], { a => 1 } # +fetch
+$x->{a} = 1 # [ keys %$x ] # '', [ 'a' ], { a => 1 } # +exists +delete +store
 
 $x # keys %{$x->{a}} # '', 0, { a => { } }
 $x # keys %{$x->{a}} # '', 0, undef        #
@@ -76,10 +80,10 @@ $x # [ values %$x ] # '', [ ], undef #
 $x # [ values %$x ] # '', [ ], undef # +fetch
 $x # [ values %$x ] # '', [ ], { }   # +exists +delete +store
 
-$x->{a} ='b' # [ values %$x ] # '', [ 'b' ], { a=>'b' }
-$x->{a} ='b' # [ values %$x ] # '', [ 'b' ], { a=>'b' } #
-$x->{a} ='b' # [ values %$x ] # '', [ 'b' ], { a=>'b' } # +fetch
-$x->{a} ='b' # [ values %$x ] # '', [ 'b' ], { a=>'b' } # +exists +delete +store
+$x->{a} = 1 # [ values %$x ] # '', [ 1 ], { a => 1 }
+$x->{a} = 1 # [ values %$x ] # '', [ 1 ], { a => 1 } #
+$x->{a} = 1 # [ values %$x ] # '', [ 1 ], { a => 1 } # +fetch
+$x->{a} = 1 # [ values %$x ] # '', [ 1 ], { a => 1 } # +exists +delete +store
 
 $x # values %{$x->{a}} # '', 0, { a => { } }
 $x # values %{$x->{a}} # '', 0, undef        #

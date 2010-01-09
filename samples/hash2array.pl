@@ -3,7 +3,7 @@
 use strict;
 use warnings;
 
-use Fatal qw/open/;
+use Fatal qw/open close/;
 use Text::Balanced qw/extract_bracketed/;
 
 open my $hash_t,       '<', 't/20-hash.t';
@@ -27,13 +27,48 @@ sub hash2array {
 
 sub dump_array {
  my ($a) = @_;
+
  return 'undef' unless defined $a;
- return $a      unless ref $a;
- die "Invalid argument" unless ref $a eq 'ARRAY';
- return '[ ' . join(', ', map dump_array($_), @$a) . ' ]';
+
+ if (ref $a) {
+  die "Invalid argument" unless ref $a eq 'ARRAY';
+  return '[ ' . join(', ', map dump_array($_), @$a) . ' ]';
+ } else {
+  $a = "'\Q$a\E'" if $a !~ /^\s*\d/;
+  return $a;
+ }
 }
 
-sub extract ($) { extract_bracketed $_[0], '{',  qr/.*?(?<!\\)(?:\\\\)*(?={)/ }
+sub extract ($$) {
+ extract_bracketed $_[0], $_[1],  qr/.*?(?<![\\@%])(?:\\\\)*(?=$_[1])/
+}
+
+sub convert_testcase ($$) {
+ local $_ = $_[0];
+ my $fast = $_[1];
+
+ s!(\ba\b)?(\s*)HASH\b!($1 ? 'an': '') . "$2ARRAY"!eg;
+ s{
+  [\{\[]\s*(['"]?[a-z]['"]?(?:\s*,\s*['"]?[a-z]['"]?)*)\s*[\}\]]
+ }{
+  '[' . join(', ', map { my $n = num($_); $fast ? $n : "\$N[$n]" }
+                    split /\s*,\s*/, $1) . ']'
+ }gex;
+ s!%(\{?)\$!\@$1\$!g;
+
+ my $buf;
+ my $suffix = $_;
+ my ($bracket, $prefix);
+ while (do { ($bracket, $suffix, $prefix) = extract($suffix, '{'); $bracket }) {
+  my $array = dump_array(hash2array(eval $bracket));
+  $buf .= $prefix . $array;
+ }
+ $buf .= $suffix;
+ $buf =~ s/\s+/ /g;
+ $buf =~ s/\s+$//;
+
+ return "$buf\n";
+}
 
 my $in_data;
 while (<$hash_t>) {
@@ -46,26 +81,31 @@ while (<$hash_t>) {
   print $array_t      $_;
   print $array_fast_t $_;
  } else {
-  for my $file ([ 1, $array_t ], [ 0, $array_fast_t ]) {
-   local $_ = $_;
-   s!(\ba\b)?(\s*)HASH\b!($1 ? 'an': '') . "$2ARRAY"!eg;
-   s{
-    {\s*(['"]?[a-z]['"]?(?:\s*,\s*['"]?[a-z]['"]?)*)\s*}
-   }{
-    '[' . join(', ', map { my $n = num($_); $file->[0] ? "\$N[$n]" : $n }
-                      split /\s*,\s*/, $1) . ']'
-   }gex;
-   s!%(\{?)\$!\@$1\$!g;
-   my $buf;
-   my $suffix = $_;
-   my ($bracket, $prefix);
-   while (do { ($bracket, $suffix, $prefix) = extract($suffix); $bracket }) {
-    $buf .= $prefix . dump_array(hash2array(eval $bracket));
-   }
-   $buf .= $suffix;
-   $buf =~ s/\s+/ /g;
-   $buf =~ s/\s+$//;
-   print { $file->[1] } "$buf\n";
-  }
+  print $array_t      convert_testcase($_, 0);
+  print $array_fast_t convert_testcase($_, 1);
  }
+}
+
+close $hash_t;
+close $array_t;
+close $array_fast_t;
+
+open my $hash_specific_t,  '<', 't/22-hash-kv.t';
+open my $array_specific_t, '>', 't/32-array-kv.t';
+
+$in_data = 0;
+while (<$hash_specific_t>) {
+ if (/^__DATA__$/) {
+  $in_data = 1;
+ } elsif (!$in_data) {
+  s{'%'}{'\@'};
+  if (/\bplan\s*[\s\(]\s*tests\b/) {
+   s/\s*;?\s*$//;
+   s/^(\s*)//;
+   $_ = "$1if (\$] >= 5.011) { $_ } else { plan skip_all => 'perl 5.11 required for keys/values \@array' }\n";
+  }
+ } else {
+  $_ = convert_testcase($_, 1);
+ }
+ print $array_specific_t $_;
 }
