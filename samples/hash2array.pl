@@ -90,11 +90,11 @@ close $hash_t;
 close $array_t;
 close $array_fast_t;
 
-open my $hash_specific_t,  '<', 't/22-hash-kv.t';
-open my $array_specific_t, '>', 't/32-array-kv.t';
+open my $hash_kv_t,  '<', 't/22-hash-kv.t';
+open my $array_kv_t, '>', 't/32-array-kv.t';
 
 $in_data = 0;
-while (<$hash_specific_t>) {
+while (<$hash_kv_t>) {
  if (/^__DATA__$/) {
   $in_data = 1;
  } elsif (!$in_data) {
@@ -107,5 +107,5 @@ while (<$hash_specific_t>) {
  } else {
   $_ = convert_testcase($_, 1);
  }
- print $array_specific_t $_;
+ print $array_kv_t $_;
 }
