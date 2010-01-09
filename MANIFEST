@@ -9,7 +9,7 @@ ptable.h
 samples/hash2array.pl
 t/00-load.t
 t/20-hash.t
-t/21-hash-specific.t
+t/22-hash-kv.t
 t/30-array.t
 t/31-array-fast.t
 t/40-scope.t
