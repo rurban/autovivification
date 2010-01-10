@@ -151,6 +151,12 @@ sub import {
  ();
 }
 
+=head1 CAVEATS
+
+The pragma doesn't apply when one dereferences the returned value of an array or hash slice, as in C<< @array[$id]->{member} >> or C<< @hash{$key}->{member} >>.
+This syntax is valid Perl, yet it's discouraged as the slice is here useless since the dereferencing enforces scalar context.
+If warnings are turned on, Perl will complain about one-element slices.
+
 =head1 DEPENDENCIES
 
 L<perl> 5.8.
