@@ -1,5 +1,9 @@
 Revision history for autovivification
 
+0.04    2010-01-10 00:30 UTC
+        + Add : Array and hash slices are now handled by the pragma.
+        + Fix : Work around Kwalitee test misfailures.
+
 0.03    2009-06-23 22:20 UTC
         + Add : Handle old-fashion dereferencing (like $$hashref{key}).
         + Chg : Aliasing constructs (for ($x{foo}) { ... }) are now covered by

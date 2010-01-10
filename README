@@ -2,7 +2,7 @@ NAME
     autovivification - Lexically disable autovivification.
 
 VERSION
-    Version 0.03
+    Version 0.04
 
 SYNOPSIS
         no autovivification;
@@ -41,10 +41,11 @@ METHODS
 
         Turn off autovivification for rvalue dereferencing expressions, such
         as "$value = $hashref->{key}[$idx]{$field}", "keys
-        %{$hashref->{key}}" or "values %{$hashref->{key}}". When the
-        expression would have autovivified, "undef" is returned for a plain
-        fetch, while "keys" and "values" return 0 in scalar context and the
-        empty list in list context.
+        %{$hashref->{key}}" or "values %{$hashref->{key}}". Starting from
+        perl 5.11, it also covers "leys" and "values" on array references.
+        When the expression would have autovivified, "undef" is returned for
+        a plain fetch, while "keys" and "values" return 0 in scalar context
+        and the empty list in list context.
 
     *   'exists'
 
@@ -92,6 +93,14 @@ METHODS
     When @opts is empty, it defaults to restoring the original Perl
     autovivification behaviour.
 
+CAVEATS
+    The pragma doesn't apply when one dereferences the returned value of an
+    array or hash slice, as in "@array[$id]->{member}" or
+    @hash{$key}->{member}. This syntax is valid Perl, yet it's discouraged
+    as the slice is here useless since the dereferencing enforces scalar
+    context. If warnings are turned on, Perl will complain about one-element
+    slices.
+
 DEPENDENCIES
     perl 5.8.
 
@@ -124,7 +133,7 @@ ACKNOWLEDGEMENTS
     Matt S. Trout asked for it.
 
 COPYRIGHT & LICENSE
-    Copyright 2009 Vincent Pit, all rights reserved.
+    Copyright 2009,2010 Vincent Pit, all rights reserved.
 
     This program is free software; you can redistribute it and/or modify it
     under the same terms as Perl itself.
