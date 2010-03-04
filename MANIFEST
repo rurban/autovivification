@@ -15,6 +15,7 @@ t/31-array-fast.t
 t/32-array-kv.t
 t/40-scope.t
 t/41-padsv.t
+t/42-deparse.t
 t/91-pod.t
 t/92-pod-coverage.t
 t/95-portability-files.t

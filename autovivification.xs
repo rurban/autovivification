@@ -94,7 +94,18 @@ STATIC UV a_detag(pTHX_ const SV *hint) {
 #else /* A_WORKAROUND_REQUIRE_PROPAGATION */
 
 #define a_tag(B)   newSVuv(B)
-#define a_detag(H) (((H) && SvOK(H)) ? SvUVX(H) : 0)
+/* PVs fetched from the hints chain have their SvLEN set to zero, so get the UV
+ * from a copy. */
+#define a_detag(H) \
+ ((H)              \
+  ? (SvIOK(H)      \
+     ? SvUVX(H)    \
+     : (SvPOK(H)   \
+        ? sv_2uv(SvLEN(H) ? (H) : sv_mortalcopy(H)) \
+	: 0        \
+       )           \
+     )             \
+  : 0)
 
 #endif /* !A_WORKAROUND_REQUIRE_PROPAGATION */
 
