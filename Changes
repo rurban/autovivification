@@ -1,5 +1,13 @@
 Revision history for autovivification
 
+0.05    2010-03-05 23:15 UTC
+        + Fix : [RT #55154] : Crashes and assertion failures when deparsing and
+                re-eval-uating some code compiled while autovivification was in
+                use.
+                Thanks Michael G. Schwern for reporting.
+        + Fix : [RT #53647] : "leys" typo in pod.
+                Thanks Hinrik Orn Sigurdsson for reporting.
+
 0.04    2010-01-10 00:30 UTC
         + Add : Array and hash slices are now handled by the pragma.
         + Fix : Work around Kwalitee test misfailures.

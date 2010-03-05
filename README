@@ -2,7 +2,7 @@ NAME
     autovivification - Lexically disable autovivification.
 
 VERSION
-    Version 0.04
+    Version 0.05
 
 SYNOPSIS
         no autovivification;
@@ -42,7 +42,7 @@ METHODS
         Turn off autovivification for rvalue dereferencing expressions, such
         as "$value = $hashref->{key}[$idx]{$field}", "keys
         %{$hashref->{key}}" or "values %{$hashref->{key}}". Starting from
-        perl 5.11, it also covers "leys" and "values" on array references.
+        perl 5.11, it also covers "keys" and "values" on array references.
         When the expression would have autovivified, "undef" is returned for
         a plain fetch, while "keys" and "values" return 0 in scalar context
         and the empty list in list context.
