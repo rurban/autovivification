@@ -378,7 +378,9 @@ STATIC bool a_defined(pTHX_ SV *sv) {
     defined = TRUE;
    break;
   default:
-   defined = SvOK(sv);
+   SvGETMAGIC(sv);
+   if (SvOK(sv))
+    defined = TRUE;
  }
 
  return defined;
@@ -403,7 +405,7 @@ STATIC OP *a_pp_rv2av(pTHX) {
  flags = oi.flags;
 
  if (flags & A_HINT_DEREF) {
-  if (!SvOK(TOPs)) {
+  if (!a_defined(TOPs)) {
    /* We always need to push an empty array to fool the pp_aelem() that comes
     * later. */
    SV *av;
@@ -430,7 +432,7 @@ STATIC OP *a_pp_rv2hv_simple(pTHX) {
  flags = oi.flags;
 
  if (flags & A_HINT_DEREF) {
-  if (!SvOK(TOPs))
+  if (!a_defined(TOPs))
    RETURN;
  } else {
   PL_op->op_ppaddr = oi.old_pp;
@@ -448,7 +450,7 @@ STATIC OP *a_pp_rv2hv(pTHX) {
  flags = oi.flags;
 
  if (flags & A_HINT_DEREF) {
-  if (!SvOK(TOPs)) {
+  if (!a_defined(TOPs)) {
    SV *hv;
    POPs;
    hv = sv_2mortal((SV *) newHV());
@@ -484,7 +486,7 @@ deref:
 
   if (flags & (A_HINT_NOTIFY|A_HINT_STORE)) {
    SPAGAIN;
-   if (!SvOK(TOPs)) {
+   if (!a_defined(TOPs)) {
     if (flags & A_HINT_STRICT)
      croak("Reference vivification forbidden");
     else if (flags & A_HINT_WARN)

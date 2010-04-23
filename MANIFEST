@@ -10,9 +10,11 @@ samples/hash2array.pl
 t/00-load.t
 t/20-hash.t
 t/22-hash-kv.t
+t/23-hash-tied.t
 t/30-array.t
 t/31-array-fast.t
 t/32-array-kv.t
+t/33-array-tied.t
 t/40-scope.t
 t/41-padsv.t
 t/42-deparse.t
