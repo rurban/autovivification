@@ -1,9 +1,9 @@
-#!perl -T
+#!perl
 
 use strict;
 use warnings;
 
-use Test::More tests => 8;
+use Test::More tests => 12;
 
 use lib 't/lib';
 
@@ -40,4 +40,32 @@ our $blurp;
  $expect = { r1_main => { }, r1_eval => { } };
  $expect->{r2_eval} = { } if $] <  5.009005;
  is_deeply $blurp, $expect, 'second require test didn\'t vivify';
+}
+
+# This test may not fail for the old version when ran in taint mode
+{
+ my $err = eval <<' SNIP';
+  use autovivification::TestRequired4::a0;
+  autovivification::TestRequired4::a0::error();
+ SNIP
+ is $err, '', 'RT #50570';
+}
+
+# This test must be in the topmost scope
+BEGIN { eval 'use autovivification::TestRequired5::a0' }
+my $err = autovivification::TestRequired5::a0::error();
+is $err, '', 'identifying requires by their eval context pointer is not enough';
+
+{
+ local $blurp;
+
+ no autovivification;
+ use autovivification::TestRequired6;
+
+ autovivification::TestRequired6::bar();
+ is_deeply $blurp, { }, 'vivified without eval';
+
+ $blurp = undef;
+ autovivification::TestRequired6::baz();
+ is_deeply $blurp, { }, 'vivified with eval';
 }

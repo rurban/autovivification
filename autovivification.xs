@@ -11,84 +11,245 @@
 
 /* --- Compatibility wrappers ---------------------------------------------- */
 
+#ifndef HvNAME_get
+# define HvNAME_get(H) HvNAME(H)
+#endif
+
+#ifndef HvNAMELEN_get
+# define HvNAMELEN_get(H) strlen(HvNAME_get(H))
+#endif
+
 #define A_HAS_PERL(R, V, S) (PERL_REVISION > (R) || (PERL_REVISION == (R) && (PERL_VERSION > (V) || (PERL_VERSION == (V) && (PERL_SUBVERSION >= (S))))))
+
+#undef ENTERn
+#if defined(ENTER_with_name) && !A_HAS_PERL(5, 11, 4)
+# define ENTERn(N) ENTER_with_name(N)
+#else
+# define ENTERn(N) ENTER
+#endif
+
+#undef LEAVEn
+#if defined(LEAVE_with_name) && !A_HAS_PERL(5, 11, 4)
+# define LEAVEn(N) LEAVE_with_name(N)
+#else
+# define LEAVEn(N) LEAVE
+#endif
 
 #ifndef A_WORKAROUND_REQUIRE_PROPAGATION
 # define A_WORKAROUND_REQUIRE_PROPAGATION !A_HAS_PERL(5, 10, 1)
 #endif
 
+/* ... Thread safety and multiplicity ...................................... */
+
+#ifndef A_MULTIPLICITY
+# if defined(MULTIPLICITY) || defined(PERL_IMPLICIT_CONTEXT)
+#  define A_MULTIPLICITY 1
+# else
+#  define A_MULTIPLICITY 0
+# endif
+#endif
+#if A_MULTIPLICITY && !defined(tTHX)
+# define tTHX PerlInterpreter*
+#endif
+
+#if A_MULTIPLICITY && defined(USE_ITHREADS) && defined(dMY_CXT) && defined(MY_CXT) && defined(START_MY_CXT) && defined(MY_CXT_INIT) && (defined(MY_CXT_CLONE) || defined(dMY_CXT_SV))
+# define A_THREADSAFE 1
+# ifndef MY_CXT_CLONE
+#  define MY_CXT_CLONE \
+    dMY_CXT_SV;                                                      \
+    my_cxt_t *my_cxtp = (my_cxt_t*)SvPVX(newSV(sizeof(my_cxt_t)-1)); \
+    Copy(INT2PTR(my_cxt_t*, SvUV(my_cxt_sv)), my_cxtp, 1, my_cxt_t); \
+    sv_setuv(my_cxt_sv, PTR2UV(my_cxtp))
+# endif
+#else
+# define A_THREADSAFE 0
+# undef  dMY_CXT
+# define dMY_CXT      dNOOP
+# undef  MY_CXT
+# define MY_CXT       a_globaldata
+# undef  START_MY_CXT
+# define START_MY_CXT STATIC my_cxt_t MY_CXT;
+# undef  MY_CXT_INIT
+# define MY_CXT_INIT  NOOP
+# undef  MY_CXT_CLONE
+# define MY_CXT_CLONE NOOP
+#endif
+
 /* --- Helpers ------------------------------------------------------------- */
 
-#if A_WORKAROUND_REQUIRE_PROPAGATION
-
-#define A_ENCODE_UV(B, U)   \
- len = 0;                   \
- while (len < sizeof(UV)) { \
-  (B)[len++] = (U) & 0xFF;  \
-  (U) >>= 8;                \
- }
-
-#define A_DECODE_UV(U, B)        \
- len = sizeof(UV);               \
- while (len > 0)                 \
-  (U) = ((U) << 8) | (B)[--len];
+/* ... Thread-safe hints ................................................... */
 
 #if A_WORKAROUND_REQUIRE_PROPAGATION
-STATIC UV a_require_tag(pTHX) {
-#define a_require_tag() a_require_tag(aTHX)
- const PERL_SI *si;
 
- for (si = PL_curstackinfo; si; si = si->si_prev) {
-  I32 cxix;
+typedef struct {
+ U32 bits;
+ IV  require_tag;
+} a_hint_t;
 
-  for (cxix = si->si_cxix; cxix >= 0; --cxix) {
-   const PERL_CONTEXT *cx = si->si_cxstack + cxix;
+#define A_HINT_BITS(H) ((H)->bits)
 
-   if (CxTYPE(cx) == CXt_EVAL && cx->blk_eval.old_op_type == OP_REQUIRE)
-    return PTR2UV(cx);
-  }
+#define A_HINT_FREE(H) PerlMemShared_free(H)
+
+#if A_THREADSAFE
+
+#define PTABLE_NAME        ptable_hints
+#define PTABLE_VAL_FREE(V) A_HINT_FREE(V)
+
+#define pPTBL  pTHX
+#define pPTBL_ pTHX_
+#define aPTBL  aTHX
+#define aPTBL_ aTHX_
+
+#include "ptable.h"
+
+#define ptable_hints_store(T, K, V) ptable_hints_store(aTHX_ (T), (K), (V))
+#define ptable_hints_free(T)        ptable_hints_free(aTHX_ (T))
+
+#define MY_CXT_KEY __PACKAGE__ "::_guts" XS_VERSION
+
+typedef struct {
+ ptable *tbl;   /* It really is a ptable_hints */
+ tTHX    owner;
+} my_cxt_t;
+
+START_MY_CXT
+
+STATIC SV *a_clone(pTHX_ SV *sv, tTHX owner) {
+#define a_clone(S, O) a_clone(aTHX_ (S), (O))
+ CLONE_PARAMS  param;
+ AV           *stashes = NULL;
+ SV           *dupsv;
+
+ if (SvTYPE(sv) == SVt_PVHV && HvNAME_get(sv))
+  stashes = newAV();
+
+ param.stashes    = stashes;
+ param.flags      = 0;
+ param.proto_perl = owner;
+
+ dupsv = sv_dup(sv, &param);
+
+ if (stashes) {
+  av_undef(stashes);
+  SvREFCNT_dec(stashes);
  }
 
- return PTR2UV(NULL);
+ return SvREFCNT_inc(dupsv);
 }
-#endif /* A_WORKAROUND_REQUIRE_PROPAGATION */
+
+STATIC void a_ptable_clone(pTHX_ ptable_ent *ent, void *ud_) {
+ my_cxt_t *ud = ud_;
+ a_hint_t *h1 = ent->val;
+ a_hint_t *h2;
+
+ if (ud->owner == aTHX)
+  return;
+
+ h2              = PerlMemShared_malloc(sizeof *h2);
+ h2->require_tag = PTR2IV(a_clone(INT2PTR(SV *, h1->require_tag), ud->owner));
+
+ ptable_hints_store(ud->tbl, ent->key, h2);
+}
+
+STATIC void a_thread_cleanup(pTHX_ void *);
+
+STATIC void a_thread_cleanup(pTHX_ void *ud) {
+ int *level = ud;
+
+ if (*level) {
+  *level = 0;
+  LEAVE;
+  SAVEDESTRUCTOR_X(a_thread_cleanup, level);
+  ENTER;
+ } else {
+  dMY_CXT;
+  PerlMemShared_free(level);
+  ptable_hints_free(MY_CXT.tbl);
+ }
+}
+
+#endif /* A_THREADSAFE */
+
+STATIC IV a_require_tag(pTHX) {
+#define a_require_tag() a_require_tag(aTHX)
+ const CV *cv, *outside;
+
+ cv = PL_compcv;
+
+ if (!cv) {
+  /* If for some reason the pragma is operational at run-time, try to discover
+   * the current cv in use. */
+  const PERL_SI *si;
+
+  for (si = PL_curstackinfo; si; si = si->si_prev) {
+   I32 cxix;
+
+   for (cxix = si->si_cxix; cxix >= 0; --cxix) {
+    const PERL_CONTEXT *cx = si->si_cxstack + cxix;
+
+    switch (CxTYPE(cx)) {
+     case CXt_SUB:
+     case CXt_FORMAT:
+      /* The propagation workaround is only needed up to 5.10.0 and at that
+       * time format and sub contexts were still identical. And even later the
+       * cv members offsets should have been kept the same. */
+      cv = cx->blk_sub.cv;
+      goto get_enclosing_cv;
+     case CXt_EVAL:
+      cv = cx->blk_eval.cv;
+      goto get_enclosing_cv;
+     default:
+      break;
+    }
+   }
+  }
+
+  cv = PL_main_cv;
+ }
+
+get_enclosing_cv:
+ for (outside = CvOUTSIDE(cv); outside; outside = CvOUTSIDE(cv))
+  cv = outside;
+
+ return PTR2IV(cv);
+}
 
 STATIC SV *a_tag(pTHX_ UV bits) {
 #define a_tag(B) a_tag(aTHX_ (B))
- SV            *hint;
- const PERL_SI *si;
- UV             cxreq;
- unsigned char  buf[sizeof(UV) * 2];
- STRLEN         len;
+ a_hint_t *h;
+ dMY_CXT;
 
- cxreq = a_require_tag();
- A_ENCODE_UV(buf,              cxreq);
- A_ENCODE_UV(buf + sizeof(UV), bits);
- hint = newSVpvn(buf, sizeof buf);
- SvREADONLY_on(hint);
+ h              = PerlMemShared_malloc(sizeof *h);
+ h->bits        = bits;
+ h->require_tag = a_require_tag();
 
- return hint;
+#if A_THREADSAFE
+ /* We only need for the key to be an unique tag for looking up the value later.
+  * Allocated memory provides convenient unique identifiers, so that's why we
+  * use the hint as the key itself. */
+ ptable_hints_store(MY_CXT.tbl, h, h);
+#endif /* A_THREADSAFE */
+
+ return newSViv(PTR2IV(h));
 }
 
 STATIC UV a_detag(pTHX_ const SV *hint) {
 #define a_detag(H) a_detag(aTHX_ (H))
- const PERL_SI *si;
- UV             cxreq = 0, bits = 0;
- unsigned char *buf;
- STRLEN         len;
+ a_hint_t *h;
+ dMY_CXT;
 
- if (!(hint && SvOK(hint)))
+ if (!(hint && SvIOK(hint)))
   return 0;
 
- buf = SvPVX(hint);
+ h = INT2PTR(a_hint_t *, SvIVX(hint));
+#if A_THREADSAFE
+ h = ptable_fetch(MY_CXT.tbl, h);
+#endif /* A_THREADSAFE */
 
- A_DECODE_UV(cxreq, buf);
- if (a_require_tag() != cxreq)
+ if (a_require_tag() != h->require_tag)
   return 0;
 
- A_DECODE_UV(bits,  buf + sizeof(UV));
-
- return bits;
+ return A_HINT_BITS(h);
 }
 
 #else /* A_WORKAROUND_REQUIRE_PROPAGATION */
@@ -814,6 +975,11 @@ BOOT:
 {                                    
  if (!a_initialized++) {
   HV *stash;
+#if A_THREADSAFE && A_WORKAROUND_REQUIRE_PROPAGATION
+  MY_CXT_INIT;
+  MY_CXT.tbl   = ptable_new();
+  MY_CXT.owner = aTHX;
+#endif
 
   a_op_map = ptable_new();
 #ifdef USE_ITHREADS
@@ -863,6 +1029,37 @@ BOOT:
   newCONSTSUB(stash, "A_HINT_MASK",   newSVuv(A_HINT_MASK));
  }
 }
+
+#if A_THREADSAFE && A_WORKAROUND_REQUIRE_PROPAGATION
+
+void
+CLONE(...)
+PROTOTYPE: DISABLE
+PREINIT:
+ ptable *t;
+ int    *level;
+CODE:
+ {
+  my_cxt_t ud;
+  dMY_CXT;
+  ud.tbl   = t = ptable_new();
+  ud.owner = MY_CXT.owner;
+  ptable_walk(MY_CXT.tbl, a_ptable_clone, &ud);
+ }
+ {
+  MY_CXT_CLONE;
+  MY_CXT.tbl   = t;
+  MY_CXT.owner = aTHX;
+ }
+ {
+  level = PerlMemShared_malloc(sizeof *level);
+  *level = 1;
+  LEAVEn("sub");
+  SAVEDESTRUCTOR_X(a_thread_cleanup, level);
+  ENTERn("sub");
+ }
+
+#endif
 
 SV *
 _tag(SV *hint)
