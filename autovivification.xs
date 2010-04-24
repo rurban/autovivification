@@ -86,8 +86,6 @@ typedef struct {
  IV  require_tag;
 } a_hint_t;
 
-#define A_HINT_BITS(H) ((H)->bits)
-
 #define A_HINT_FREE(H) PerlMemShared_free(H)
 
 #if A_THREADSAFE
@@ -146,6 +144,7 @@ STATIC void a_ptable_clone(pTHX_ ptable_ent *ent, void *ud_) {
   return;
 
  h2              = PerlMemShared_malloc(sizeof *h2);
+ h2->bits        = h1->bits;
  h2->require_tag = PTR2IV(a_clone(INT2PTR(SV *, h1->require_tag), ud->owner));
 
  ptable_hints_store(ud->tbl, ent->key, h2);
@@ -249,7 +248,7 @@ STATIC UV a_detag(pTHX_ const SV *hint) {
  if (a_require_tag() != h->require_tag)
   return 0;
 
- return A_HINT_BITS(h);
+ return h->bits;
 }
 
 #else /* A_WORKAROUND_REQUIRE_PROPAGATION */
