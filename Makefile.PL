@@ -4,6 +4,20 @@ use strict;
 use warnings;
 use ExtUtils::MakeMaker;
 
+my @DEFINES;
+
+# Threads, Windows and 5.8.x don't seem to be best friends
+if ($^O eq 'MSWin32' && $^V lt v5.9.0) {
+ push @DEFINES, '-DA_MULTIPLICITY=0';
+}
+
+# Fork emulation got "fixed" in 5.10.1
+if ($^O eq 'MSWin32' && $^V lt v5.10.1) {
+ push @DEFINES, '-DA_FORKSAFE=0';
+}
+
+@DEFINES = (DEFINE => join ' ', @DEFINES) if @DEFINES;
+
 my $dist = 'autovivification';
 
 (my $name = $dist) =~ s{-}{::}g;
@@ -24,7 +38,7 @@ my %META = (
   'Test::More'          => 0,
   %PREREQ_PM,
  },
- dynamic_config => 0,
+ dynamic_config => 1,
  resources => {
   bugtracker => "http://rt.cpan.org/NoAuth/ReportBug.html?Queue=$dist",
   homepage   => "http://search.cpan.org/dist/$dist/",
@@ -40,6 +54,7 @@ WriteMakefile(
  VERSION_FROM     => $file,
  ABSTRACT_FROM    => $file,
  PL_FILES         => {},
+ @DEFINES,
  PREREQ_PM        => \%PREREQ_PM,
  MIN_PERL_VERSION => 5.008,
  META_MERGE       => \%META,

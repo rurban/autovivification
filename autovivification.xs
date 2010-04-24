@@ -41,6 +41,15 @@
 
 /* ... Thread safety and multiplicity ...................................... */
 
+/* Always safe when the workaround isn't needed */
+#if !A_WORKAROUND_REQUIRE_PROPAGATION
+# undef A_FORKSAFE
+# define A_FORKSAFE 1
+/* Otherwise, safe unless Makefile.PL says it's Win32 */
+#elif !defined(A_FORKSAFE)
+# define A_FORKSAFE 1
+#endif
+
 #ifndef A_MULTIPLICITY
 # if defined(MULTIPLICITY) || defined(PERL_IMPLICIT_CONTEXT)
 #  define A_MULTIPLICITY 1
@@ -1026,6 +1035,8 @@ BOOT:
   newCONSTSUB(stash, "A_HINT_EXISTS", newSVuv(A_HINT_EXISTS));
   newCONSTSUB(stash, "A_HINT_DELETE", newSVuv(A_HINT_DELETE));
   newCONSTSUB(stash, "A_HINT_MASK",   newSVuv(A_HINT_MASK));
+  newCONSTSUB(stash, "A_THREADSAFE",  newSVuv(A_THREADSAFE));
+  newCONSTSUB(stash, "A_FORKSAFE",    newSVuv(A_FORKSAFE));
  }
 }
 
