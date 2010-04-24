@@ -973,6 +973,117 @@ STATIC OP *a_ck_root(pTHX_ OP *o) {
 
 STATIC U32 a_initialized = 0;
 
+STATIC void a_teardown(pTHX_ void *root) {
+
+ if (!a_initialized)
+  return;
+
+#if A_MULTIPLICITY
+ if (aTHX != root)
+  return;
+#endif
+
+#if A_THREADSAFE && A_WORKAROUND_REQUIRE_PROPAGATION
+ {
+  dMY_CXT;
+  ptable_hints_free(MY_CXT.tbl);
+ }
+#endif
+
+ PL_check[OP_PADANY] = MEMBER_TO_FPTR(a_old_ck_padany);
+ a_old_ck_padany     = 0;
+ PL_check[OP_PADSV]  = MEMBER_TO_FPTR(a_old_ck_padsv);
+ a_old_ck_padsv      = 0;
+
+ PL_check[OP_AELEM]  = MEMBER_TO_FPTR(a_old_ck_aelem);
+ a_old_ck_aelem      = 0;
+ PL_check[OP_HELEM]  = MEMBER_TO_FPTR(a_old_ck_helem);
+ a_old_ck_helem      = 0;
+ PL_check[OP_RV2SV]  = MEMBER_TO_FPTR(a_old_ck_rv2sv);
+ a_old_ck_rv2sv      = 0;
+
+ PL_check[OP_RV2AV]  = MEMBER_TO_FPTR(a_old_ck_rv2av);
+ a_old_ck_rv2av      = 0;
+ PL_check[OP_RV2HV]  = MEMBER_TO_FPTR(a_old_ck_rv2hv);
+ a_old_ck_rv2hv      = 0;
+
+ PL_check[OP_ASLICE] = MEMBER_TO_FPTR(a_old_ck_aslice);
+ a_old_ck_aslice     = 0;
+ PL_check[OP_HSLICE] = MEMBER_TO_FPTR(a_old_ck_hslice);
+ a_old_ck_hslice     = 0;
+
+ PL_check[OP_EXISTS] = MEMBER_TO_FPTR(a_old_ck_exists);
+ a_old_ck_exists     = 0;
+ PL_check[OP_DELETE] = MEMBER_TO_FPTR(a_old_ck_delete);
+ a_old_ck_delete     = 0;
+ PL_check[OP_KEYS]   = MEMBER_TO_FPTR(a_old_ck_keys);
+ a_old_ck_keys       = 0;
+ PL_check[OP_VALUES] = MEMBER_TO_FPTR(a_old_ck_values);
+ a_old_ck_values     = 0;
+
+ if (a_pp_padsv_saved) {
+  PL_ppaddr[OP_PADSV] = a_pp_padsv_saved;
+  a_pp_padsv_saved    = 0;
+ }
+
+ a_initialized = 0;
+}
+
+STATIC void a_setup(pTHX) {
+#define a_setup() a_setup(aTHX)
+ if (a_initialized)
+  return;
+
+#if A_THREADSAFE && A_WORKAROUND_REQUIRE_PROPAGATION
+ {
+  MY_CXT_INIT;
+  MY_CXT.tbl   = ptable_new();
+  MY_CXT.owner = aTHX;
+ }
+#endif
+
+ a_old_ck_padany     = PL_check[OP_PADANY];
+ PL_check[OP_PADANY] = MEMBER_TO_FPTR(a_ck_padany);
+ a_old_ck_padsv      = PL_check[OP_PADSV];
+ PL_check[OP_PADSV]  = MEMBER_TO_FPTR(a_ck_padsv);
+
+ a_old_ck_aelem      = PL_check[OP_AELEM];
+ PL_check[OP_AELEM]  = MEMBER_TO_FPTR(a_ck_deref);
+ a_old_ck_helem      = PL_check[OP_HELEM];
+ PL_check[OP_HELEM]  = MEMBER_TO_FPTR(a_ck_deref);
+ a_old_ck_rv2sv      = PL_check[OP_RV2SV];
+ PL_check[OP_RV2SV]  = MEMBER_TO_FPTR(a_ck_deref);
+
+ a_old_ck_rv2av      = PL_check[OP_RV2AV];
+ PL_check[OP_RV2AV]  = MEMBER_TO_FPTR(a_ck_rv2xv);
+ a_old_ck_rv2hv      = PL_check[OP_RV2HV];
+ PL_check[OP_RV2HV]  = MEMBER_TO_FPTR(a_ck_rv2xv);
+
+ a_old_ck_aslice     = PL_check[OP_ASLICE];
+ PL_check[OP_ASLICE] = MEMBER_TO_FPTR(a_ck_xslice);
+ a_old_ck_hslice     = PL_check[OP_HSLICE];
+ PL_check[OP_HSLICE] = MEMBER_TO_FPTR(a_ck_xslice);
+
+ a_old_ck_exists     = PL_check[OP_EXISTS];
+ PL_check[OP_EXISTS] = MEMBER_TO_FPTR(a_ck_root);
+ a_old_ck_delete     = PL_check[OP_DELETE];
+ PL_check[OP_DELETE] = MEMBER_TO_FPTR(a_ck_root);
+ a_old_ck_keys       = PL_check[OP_KEYS];
+ PL_check[OP_KEYS]   = MEMBER_TO_FPTR(a_ck_root);
+ a_old_ck_values     = PL_check[OP_VALUES];
+ PL_check[OP_VALUES] = MEMBER_TO_FPTR(a_ck_root);
+
+#if A_MULTIPLICITY
+ call_atexit(a_teardown, aTHX);
+#else
+ call_atexit(a_teardown, NULL);
+#endif
+
+ a_initialized = 1;
+}
+
+STATIC U32 a_booted = 0;
+
 /* --- XS ------------------------------------------------------------------ */
 
 MODULE = autovivification      PACKAGE = autovivification
@@ -981,13 +1092,8 @@ PROTOTYPES: ENABLE
 
 BOOT: 
 {                                    
- if (!a_initialized++) {
+ if (!a_booted++) {
   HV *stash;
-#if A_THREADSAFE && A_WORKAROUND_REQUIRE_PROPAGATION
-  MY_CXT_INIT;
-  MY_CXT.tbl   = ptable_new();
-  MY_CXT.owner = aTHX;
-#endif
 
   a_op_map = ptable_new();
 #ifdef USE_ITHREADS
@@ -995,37 +1101,6 @@ BOOT:
 #endif
 
   PERL_HASH(a_hash, __PACKAGE__, __PACKAGE_LEN__);
-
-  a_old_ck_padany     = PL_check[OP_PADANY];
-  PL_check[OP_PADANY] = MEMBER_TO_FPTR(a_ck_padany);
-  a_old_ck_padsv      = PL_check[OP_PADSV];
-  PL_check[OP_PADSV]  = MEMBER_TO_FPTR(a_ck_padsv);
-
-  a_old_ck_aelem      = PL_check[OP_AELEM];
-  PL_check[OP_AELEM]  = MEMBER_TO_FPTR(a_ck_deref);
-  a_old_ck_helem      = PL_check[OP_HELEM];
-  PL_check[OP_HELEM]  = MEMBER_TO_FPTR(a_ck_deref);
-  a_old_ck_rv2sv      = PL_check[OP_RV2SV];
-  PL_check[OP_RV2SV]  = MEMBER_TO_FPTR(a_ck_deref);
-
-  a_old_ck_rv2av      = PL_check[OP_RV2AV];
-  PL_check[OP_RV2AV]  = MEMBER_TO_FPTR(a_ck_rv2xv);
-  a_old_ck_rv2hv      = PL_check[OP_RV2HV];
-  PL_check[OP_RV2HV]  = MEMBER_TO_FPTR(a_ck_rv2xv);
-
-  a_old_ck_aslice     = PL_check[OP_ASLICE];
-  PL_check[OP_ASLICE] = MEMBER_TO_FPTR(a_ck_xslice);
-  a_old_ck_hslice     = PL_check[OP_HSLICE];
-  PL_check[OP_HSLICE] = MEMBER_TO_FPTR(a_ck_xslice);
-
-  a_old_ck_exists     = PL_check[OP_EXISTS];
-  PL_check[OP_EXISTS] = MEMBER_TO_FPTR(a_ck_root);
-  a_old_ck_delete     = PL_check[OP_DELETE];
-  PL_check[OP_DELETE] = MEMBER_TO_FPTR(a_ck_root);
-  a_old_ck_keys       = PL_check[OP_KEYS];
-  PL_check[OP_KEYS]   = MEMBER_TO_FPTR(a_ck_root);
-  a_old_ck_values     = PL_check[OP_VALUES];
-  PL_check[OP_VALUES] = MEMBER_TO_FPTR(a_ck_root);
 
   stash = gv_stashpvn(__PACKAGE__, __PACKAGE_LEN__, 1);
   newCONSTSUB(stash, "A_HINT_STRICT", newSVuv(A_HINT_STRICT));
@@ -1038,6 +1113,8 @@ BOOT:
   newCONSTSUB(stash, "A_THREADSAFE",  newSVuv(A_THREADSAFE));
   newCONSTSUB(stash, "A_FORKSAFE",    newSVuv(A_FORKSAFE));
  }
+
+ a_setup();
 }
 
 #if A_THREADSAFE && A_WORKAROUND_REQUIRE_PROPAGATION
