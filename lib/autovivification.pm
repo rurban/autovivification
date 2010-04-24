@@ -156,6 +156,7 @@ sub import {
 =head2 C<A_THREADSAFE>
 
 True iff the module could have been built with thread-safety features enabled.
+This constant only has a meaning with your perl is threaded ; otherwise, it'll always be false.
 
 =head2 C<A_FORKSAFE>
 
