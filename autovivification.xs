@@ -1125,7 +1125,7 @@ PROTOTYPE: DISABLE
 PREINIT:
  ptable *t;
  int    *level;
-CODE:
+PPCODE:
  {
   my_cxt_t ud;
   dMY_CXT;
@@ -1145,6 +1145,7 @@ CODE:
   SAVEDESTRUCTOR_X(a_thread_cleanup, level);
   ENTERn("sub");
  }
+ XSRETURN(0);
 
 #endif
 
