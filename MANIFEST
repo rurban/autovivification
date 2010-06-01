@@ -18,6 +18,7 @@ t/33-array-tied.t
 t/40-scope.t
 t/41-padsv.t
 t/42-deparse.t
+t/50-threads.t
 t/51-threads-teardown.t
 t/91-pod.t
 t/92-pod-coverage.t
