@@ -159,21 +159,12 @@ STATIC void a_ptable_clone(pTHX_ ptable_ent *ent, void *ud_) {
  ptable_hints_store(ud->tbl, ent->key, h2);
 }
 
-STATIC void a_thread_cleanup(pTHX_ void *);
+#include "reap.h"
 
 STATIC void a_thread_cleanup(pTHX_ void *ud) {
- int *level = ud;
+ dMY_CXT;
 
- if (*level) {
-  *level = 0;
-  LEAVE;
-  SAVEDESTRUCTOR_X(a_thread_cleanup, level);
-  ENTER;
- } else {
-  dMY_CXT;
-  PerlMemShared_free(level);
-  ptable_hints_free(MY_CXT.tbl);
- }
+ ptable_hints_free(MY_CXT.tbl);
 }
 
 #endif /* A_THREADSAFE */
@@ -1124,7 +1115,6 @@ CLONE(...)
 PROTOTYPE: DISABLE
 PREINIT:
  ptable *t;
- int    *level;
 PPCODE:
  {
   my_cxt_t ud;
@@ -1138,13 +1128,7 @@ PPCODE:
   MY_CXT.tbl   = t;
   MY_CXT.owner = aTHX;
  }
- {
-  level = PerlMemShared_malloc(sizeof *level);
-  *level = 1;
-  LEAVEn("sub");
-  SAVEDESTRUCTOR_X(a_thread_cleanup, level);
-  ENTERn("sub");
- }
+ reap(3, a_thread_cleanup, NULL);
  XSRETURN(0);
 
 #endif
