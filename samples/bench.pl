@@ -5,6 +5,8 @@ use warnings;
 
 use Benchmark qw/cmpthese/;
 
+use blib;
+
 my $count = -1;
 
 {
@@ -44,5 +46,14 @@ my $count = -1;
  cmpthese $count, {
   fetch_hashref_nonexisting_av   => sub { $x->{a} },
   fetch_hashref_nonexisting_noav => sub { no autovivification; $x->{a} },
+ };
+}
+
+{
+ my $x = { a => { b => { c => { d => 1 } } } };
+
+ cmpthese $count, {
+  fetch_hashref4_existing_av   => sub { $x->{a}{b}{c}{d} },
+  fetch_hashref4_existing_noav => sub { no autovivification; $x->{a}{b}{c}{d} },
  };
 }
