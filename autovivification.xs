@@ -520,30 +520,30 @@ cancel:
  return oi->flags & A_HINT_ROOT ? 0 : flags;
 }
 
-/* ... Lightweight pp_defined() ............................................ */
+/* ... Inspired from pp_defined() .......................................... */
 
-STATIC bool a_defined(pTHX_ SV *sv) {
-#define a_defined(S) a_defined(aTHX_ (S))
- bool defined = FALSE;
-
+STATIC int a_undef(pTHX_ SV *sv) {
+#define a_undef(S) a_undef(aTHX_ (S))
  switch (SvTYPE(sv)) {
+  case SVt_NULL:
+   return 1;
   case SVt_PVAV:
    if (AvMAX(sv) >= 0 || SvGMAGICAL(sv)
                       || (SvRMAGICAL(sv) && mg_find(sv, PERL_MAGIC_tied)))
-    defined = TRUE;
+    return 0;
    break;
   case SVt_PVHV:
    if (HvARRAY(sv) || SvGMAGICAL(sv)
                    || (SvRMAGICAL(sv) && mg_find(sv, PERL_MAGIC_tied)))
-    defined = TRUE;
+    return 0;
    break;
   default:
    SvGETMAGIC(sv);
    if (SvOK(sv))
-    defined = TRUE;
+    return 0;
  }
 
- return defined;
+ return 1;
 }
 
 /* --- PP functions -------------------------------------------------------- */
@@ -565,7 +565,7 @@ STATIC OP *a_pp_rv2av(pTHX) {
  flags = oi.flags;
 
  if (flags & A_HINT_DEREF) {
-  if (!a_defined(TOPs)) {
+  if (a_undef(TOPs)) {
    /* We always need to push an empty array to fool the pp_aelem() that comes
     * later. */
    SV *av;
@@ -592,7 +592,7 @@ STATIC OP *a_pp_rv2hv_simple(pTHX) {
  flags = oi.flags;
 
  if (flags & A_HINT_DEREF) {
-  if (!a_defined(TOPs))
+  if (a_undef(TOPs))
    RETURN;
  } else {
   PL_op->op_ppaddr = oi.old_pp;
@@ -610,7 +610,7 @@ STATIC OP *a_pp_rv2hv(pTHX) {
  flags = oi.flags;
 
  if (flags & A_HINT_DEREF) {
-  if (!a_defined(TOPs)) {
+  if (a_undef(TOPs)) {
    SV *hv;
    POPs;
    hv = sv_2mortal((SV *) newHV());
@@ -646,7 +646,7 @@ deref:
 
   if (flags & (A_HINT_NOTIFY|A_HINT_STORE)) {
    SPAGAIN;
-   if (!a_defined(TOPs)) {
+   if (a_undef(TOPs)) {
     if (flags & A_HINT_STRICT)
      croak("Reference vivification forbidden");
     else if (flags & A_HINT_WARN)
@@ -681,7 +681,7 @@ STATIC OP *a_pp_root_unop(pTHX) {
  a_op_info oi;
  dSP;
 
- if (!a_defined(TOPs)) {
+ if (a_undef(TOPs)) {
   POPs;
   /* Can only be reached by keys or values */
   if (GIMME_V == G_SCALAR) {
@@ -700,7 +700,7 @@ STATIC OP *a_pp_root_binop(pTHX) {
  a_op_info oi;
  dSP;
 
- if (!a_defined(TOPm1s)) {
+ if (a_undef(TOPm1s)) {
   POPs;
   POPs;
   if (PL_op->op_type == OP_EXISTS)
