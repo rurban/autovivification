@@ -323,15 +323,15 @@ typedef struct {
 STATIC ptable *a_op_map = NULL;
 
 #ifdef USE_ITHREADS
+
+#define dA_MAP_THX a_op_info a_op_map_tmp_oi
+
 STATIC perl_mutex a_op_map_mutex;
-#endif
 
 STATIC const a_op_info *a_map_fetch(const OP *o, a_op_info *oi) {
  const a_op_info *val;
 
-#ifdef USE_ITHREADS
  MUTEX_LOCK(&a_op_map_mutex);
-#endif
 
  val = ptable_fetch(a_op_map, o);
  if (val) {
@@ -339,12 +339,20 @@ STATIC const a_op_info *a_map_fetch(const OP *o, a_op_info *oi) {
   val = oi;
  }
 
-#ifdef USE_ITHREADS
  MUTEX_UNLOCK(&a_op_map_mutex);
-#endif
 
  return val;
 }
+
+#define a_map_fetch(O) a_map_fetch((O), &a_op_map_tmp_oi)
+
+#else /* USE_ITHREADS */
+
+#define dA_MAP_THX dNOOP
+
+#define a_map_fetch(O) ptable_fetch(a_op_map, (O))
+
+#endif /* !USE_ITHREADS */
 
 STATIC const a_op_info *a_map_store_locked(pPTBLMS_ const OP *o, OP *(*old_pp)(pTHX), void *next, UV flags) {
 #define a_map_store_locked(O, PP, N, F) a_map_store_locked(aPTBLMS_ (O), (PP), (N), (F))
@@ -487,10 +495,10 @@ STATIC void a_map_update_flags_bottomup(const OP *o, UV flags, UV rflags) {
 
 /* ... Decide whether this expression should be autovivified or not ........ */
 
-STATIC UV a_map_resolve(const OP *o, a_op_info *oi) {
+STATIC UV a_map_resolve(const OP *o, const a_op_info *oi) {
  UV flags = 0, rflags;
  const OP *root;
- a_op_info *roi = oi;
+ const a_op_info *roi = oi;
 
  while (!(roi->flags & A_HINT_ROOT))
   roi = roi->next;
@@ -557,14 +565,13 @@ STATIC int a_undef(pTHX_ SV *sv) {
 /* ... pp_rv2av ............................................................ */
 
 STATIC OP *a_pp_rv2av(pTHX) {
- a_op_info oi;
- UV flags;
+ dA_MAP_THX;
+ const a_op_info *oi;
  dSP;
 
- a_map_fetch(PL_op, &oi);
- flags = oi.flags;
+ oi = a_map_fetch(PL_op);
 
- if (flags & A_HINT_DEREF) {
+ if (oi->flags & A_HINT_DEREF) {
   if (a_undef(TOPs)) {
    /* We always need to push an empty array to fool the pp_aelem() that comes
     * later. */
@@ -575,41 +582,39 @@ STATIC OP *a_pp_rv2av(pTHX) {
    RETURN;
   }
  } else {
-  PL_op->op_ppaddr = oi.old_pp;
+  PL_op->op_ppaddr = oi->old_pp;
  }
 
- return CALL_FPTR(oi.old_pp)(aTHX);
+ return CALL_FPTR(oi->old_pp)(aTHX);
 }
 
 /* ... pp_rv2hv ............................................................ */
 
 STATIC OP *a_pp_rv2hv_simple(pTHX) {
- a_op_info oi;
- UV flags;
+ dA_MAP_THX;
+ const a_op_info *oi;
  dSP;
 
- a_map_fetch(PL_op, &oi);
- flags = oi.flags;
+ oi = a_map_fetch(PL_op);
 
- if (flags & A_HINT_DEREF) {
+ if (oi->flags & A_HINT_DEREF) {
   if (a_undef(TOPs))
    RETURN;
  } else {
-  PL_op->op_ppaddr = oi.old_pp;
+  PL_op->op_ppaddr = oi->old_pp;
  }
 
- return CALL_FPTR(oi.old_pp)(aTHX);
+ return CALL_FPTR(oi->old_pp)(aTHX);
 }
 
 STATIC OP *a_pp_rv2hv(pTHX) {
- a_op_info oi;
- UV flags;
+ dA_MAP_THX;
+ const a_op_info *oi;
  dSP;
 
- a_map_fetch(PL_op, &oi);
- flags = oi.flags;
+ oi = a_map_fetch(PL_op);
 
- if (flags & A_HINT_DEREF) {
+ if (oi->flags & A_HINT_DEREF) {
   if (a_undef(TOPs)) {
    SV *hv;
    POPs;
@@ -618,21 +623,22 @@ STATIC OP *a_pp_rv2hv(pTHX) {
    RETURN;
   }
  } else {
-  PL_op->op_ppaddr = oi.old_pp;
+  PL_op->op_ppaddr = oi->old_pp;
  }
 
- return CALL_FPTR(oi.old_pp)(aTHX);
+ return CALL_FPTR(oi->old_pp)(aTHX);
 }
 
 /* ... pp_deref (aelem,helem,rv2sv,padsv) .................................. */
 
 STATIC OP *a_pp_deref(pTHX) {
- a_op_info oi;
+ dA_MAP_THX;
+ const a_op_info *oi;
  UV flags;
  dSP;
 
- a_map_fetch(PL_op, &oi);
- flags = oi.flags;
+ oi = a_map_fetch(PL_op);
+ flags = oi->flags;
 
  if (flags & A_HINT_DEREF) {
   OP *o;
@@ -641,7 +647,7 @@ STATIC OP *a_pp_deref(pTHX) {
 deref:
   old_private       = PL_op->op_private;
   PL_op->op_private = ((old_private & ~OPpDEREF) | OPpLVAL_DEFER);
-  o = CALL_FPTR(oi.old_pp)(aTHX);
+  o = CALL_FPTR(oi->old_pp)(aTHX);
   PL_op->op_private = old_private;
 
   if (flags & (A_HINT_NOTIFY|A_HINT_STORE)) {
@@ -661,7 +667,7 @@ deref:
                     && (PL_op->op_private & OPpDEREF || flags & A_HINT_ROOT)) {
   /* Decide if the expression must autovivify or not.
    * This branch should be called only once by expression. */
-  flags = a_map_resolve(PL_op, &oi);
+  flags = a_map_resolve(PL_op, oi);
 
   /* We need the updated flags value in the deref branch. */
   if (flags & A_HINT_DEREF)
@@ -670,15 +676,14 @@ deref:
 
  /* This op doesn't need to skip autovivification, so restore the original
   * state. */
- PL_op->op_ppaddr = oi.old_pp;
+ PL_op->op_ppaddr = oi->old_pp;
 
- return CALL_FPTR(oi.old_pp)(aTHX);
+ return CALL_FPTR(oi->old_pp)(aTHX);
 }
 
 /* ... pp_root (exists,delete,keys,values) ................................. */
 
 STATIC OP *a_pp_root_unop(pTHX) {
- a_op_info oi;
  dSP;
 
  if (a_undef(TOPs)) {
@@ -691,13 +696,14 @@ STATIC OP *a_pp_root_unop(pTHX) {
   RETURN;
  }
 
- a_map_fetch(PL_op, &oi);
-
- return CALL_FPTR(oi.old_pp)(aTHX);
+ {
+  dA_MAP_THX;
+  const a_op_info *oi = a_map_fetch(PL_op);
+  return CALL_FPTR(oi->old_pp)(aTHX);
+ }
 }
 
 STATIC OP *a_pp_root_binop(pTHX) {
- a_op_info oi;
  dSP;
 
  if (a_undef(TOPm1s)) {
@@ -709,22 +715,26 @@ STATIC OP *a_pp_root_binop(pTHX) {
    RETPUSHUNDEF;
  }
 
- a_map_fetch(PL_op, &oi);
-
- return CALL_FPTR(oi.old_pp)(aTHX);
+ {
+  dA_MAP_THX;
+  const a_op_info *oi = a_map_fetch(PL_op);
+  return CALL_FPTR(oi->old_pp)(aTHX);
+ }
 }
 
 /* --- Check functions ----------------------------------------------------- */
 
 STATIC void a_recheck_rv2xv(pTHX_ OP *o, OPCODE type, OP *(*new_pp)(pTHX)) {
 #define a_recheck_rv2xv(O, T, PP) a_recheck_rv2xv(aTHX_ (O), (T), (PP))
- a_op_info oi;
 
  if (o->op_type == type && o->op_ppaddr != new_pp
-                        && cUNOPo->op_first->op_type != OP_GV
-                        && a_map_fetch(o, &oi)) {
-  a_map_store(o, o->op_ppaddr, oi.next, oi.flags);
-  o->op_ppaddr = new_pp;
+                        && cUNOPo->op_first->op_type != OP_GV) {
+  dA_MAP_THX;
+  const a_op_info *oi = a_map_fetch(o);
+  if (oi) {
+   a_map_store(o, o->op_ppaddr, oi->next, oi->flags);
+   o->op_ppaddr = new_pp;
+  }
  }
 
  return;
