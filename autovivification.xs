@@ -121,40 +121,39 @@ typedef struct {
 
 START_MY_CXT
 
-STATIC SV *a_clone(pTHX_ SV *sv, tTHX owner) {
-#define a_clone(S, O) a_clone(aTHX_ (S), (O))
- CLONE_PARAMS  param;
- AV           *stashes = NULL;
- SV           *dupsv;
+typedef struct {
+ ptable *tbl;
+#if A_HAS_PERL(5, 13, 2)
+ CLONE_PARAMS *params;
+#else
+ CLONE_PARAMS params;
+#endif
+} a_ptable_clone_ud;
 
- if (SvTYPE(sv) == SVt_PVHV && HvNAME_get(sv))
-  stashes = newAV();
-
- param.stashes    = stashes;
- param.flags      = 0;
- param.proto_perl = owner;
-
- dupsv = sv_dup(sv, &param);
-
- if (stashes) {
-  av_undef(stashes);
-  SvREFCNT_dec(stashes);
- }
-
- return SvREFCNT_inc(dupsv);
-}
+#if A_HAS_PERL(5, 13, 2)
+# define a_ptable_clone_ud_init(U, T, O) \
+   (U).tbl    = (T); \
+   (U).params = Perl_clone_params_new((O), aTHX)
+# define a_ptable_clone_ud_deinit(U) Perl_clone_params_del((U).params)
+# define a_dup_inc(S, U)             SvREFCNT_inc(sv_dup((S), (U)->params))
+#else
+# define a_ptable_clone_ud_init(U, T, O) \
+   (U).tbl               = (T);     \
+   (U).params.stashes    = newAV(); \
+   (U).params.flags      = 0;       \
+   (U).params.proto_perl = (O)
+# define a_ptable_clone_ud_deinit(U) SvREFCNT_dec((U).params.stashes)
+# define a_dup_inc(S, U)             SvREFCNT_inc(sv_dup((S), &((U)->params)))
+#endif
 
 STATIC void a_ptable_clone(pTHX_ ptable_ent *ent, void *ud_) {
- my_cxt_t *ud = ud_;
+ a_ptable_clone_ud *ud = ud_;
  a_hint_t *h1 = ent->val;
  a_hint_t *h2;
 
- if (ud->owner == aTHX)
-  return;
-
  h2              = PerlMemShared_malloc(sizeof *h2);
  h2->bits        = h1->bits;
- h2->require_tag = PTR2IV(a_clone(INT2PTR(SV *, h1->require_tag), ud->owner));
+ h2->require_tag = PTR2IV(a_dup_inc(INT2PTR(SV *, h1->require_tag), ud));
 
  ptable_hints_store(ud->tbl, ent->key, h2);
 }
@@ -1127,11 +1126,13 @@ PREINIT:
  ptable *t;
 PPCODE:
  {
-  my_cxt_t ud;
+  a_ptable_clone_ud ud;
   dMY_CXT;
-  ud.tbl   = t = ptable_new();
-  ud.owner = MY_CXT.owner;
+
+  t = ptable_new();
+  a_ptable_clone_ud_init(ud, t, MY_CXT.owner);
   ptable_walk(MY_CXT.tbl, a_ptable_clone, &ud);
+  a_ptable_clone_ud_deinit(ud);
  }
  {
   MY_CXT_CLONE;
