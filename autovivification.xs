@@ -584,7 +584,7 @@ STATIC OP *a_pp_rv2av(pTHX) {
   PL_op->op_ppaddr = oi->old_pp;
  }
 
- return CALL_FPTR(oi->old_pp)(aTHX);
+ return oi->old_pp(aTHX);
 }
 
 /* ... pp_rv2hv ............................................................ */
@@ -603,7 +603,7 @@ STATIC OP *a_pp_rv2hv_simple(pTHX) {
   PL_op->op_ppaddr = oi->old_pp;
  }
 
- return CALL_FPTR(oi->old_pp)(aTHX);
+ return oi->old_pp(aTHX);
 }
 
 STATIC OP *a_pp_rv2hv(pTHX) {
@@ -625,7 +625,7 @@ STATIC OP *a_pp_rv2hv(pTHX) {
   PL_op->op_ppaddr = oi->old_pp;
  }
 
- return CALL_FPTR(oi->old_pp)(aTHX);
+ return oi->old_pp(aTHX);
 }
 
 /* ... pp_deref (aelem,helem,rv2sv,padsv) .................................. */
@@ -646,7 +646,7 @@ STATIC OP *a_pp_deref(pTHX) {
 deref:
   old_private       = PL_op->op_private;
   PL_op->op_private = ((old_private & ~OPpDEREF) | OPpLVAL_DEFER);
-  o = CALL_FPTR(oi->old_pp)(aTHX);
+  o = oi->old_pp(aTHX);
   PL_op->op_private = old_private;
 
   if (flags & (A_HINT_NOTIFY|A_HINT_STORE)) {
@@ -677,7 +677,7 @@ deref:
   * state. */
  PL_op->op_ppaddr = oi->old_pp;
 
- return CALL_FPTR(oi->old_pp)(aTHX);
+ return oi->old_pp(aTHX);
 }
 
 /* ... pp_root (exists,delete,keys,values) ................................. */
@@ -698,7 +698,7 @@ STATIC OP *a_pp_root_unop(pTHX) {
  {
   dA_MAP_THX;
   const a_op_info *oi = a_map_fetch(PL_op);
-  return CALL_FPTR(oi->old_pp)(aTHX);
+  return oi->old_pp(aTHX);
  }
 }
 
@@ -717,7 +717,7 @@ STATIC OP *a_pp_root_binop(pTHX) {
  {
   dA_MAP_THX;
   const a_op_info *oi = a_map_fetch(PL_op);
-  return CALL_FPTR(oi->old_pp)(aTHX);
+  return oi->old_pp(aTHX);
  }
 }
 
@@ -777,7 +777,7 @@ STATIC OP *a_ck_padany(pTHX_ OP *o) {
 
  a_pp_padsv_restore(o);
 
- o = CALL_FPTR(a_old_ck_padany)(aTHX_ o);
+ o = a_old_ck_padany(aTHX_ o);
 
  hint = a_hint();
  if (hint & A_HINT_DO) {
@@ -796,7 +796,7 @@ STATIC OP *a_ck_padsv(pTHX_ OP *o) {
 
  a_pp_padsv_restore(o);
 
- o = CALL_FPTR(a_old_ck_padsv)(aTHX_ o);
+ o = a_old_ck_padsv(aTHX_ o);
 
  hint = a_hint();
  if (hint & A_HINT_DO) {
@@ -838,7 +838,7 @@ STATIC OP *a_ck_deref(pTHX_ OP *o) {
    old_ck = a_old_ck_rv2sv;
    break;
  }
- o = CALL_FPTR(old_ck)(aTHX_ o);
+ o = old_ck(aTHX_ o);
 
  if (hint & A_HINT_DO) {
   a_map_store_root(o, o->op_ppaddr, hint);
@@ -868,7 +868,7 @@ STATIC OP *a_ck_rv2xv(pTHX_ OP *o) {
   case OP_RV2AV: old_ck = a_old_ck_rv2av; new_pp = a_pp_rv2av; break;
   case OP_RV2HV: old_ck = a_old_ck_rv2hv; new_pp = a_pp_rv2hv_simple; break;
  }
- o = CALL_FPTR(old_ck)(aTHX_ o);
+ o = old_ck(aTHX_ o);
 
  if (cUNOPo->op_first->op_type == OP_GV)
   return o;
@@ -907,7 +907,7 @@ STATIC OP *a_ck_xslice(pTHX_ OP *o) {
     a_recheck_rv2xv(cUNOPo->op_first->op_sibling, OP_RV2HV, a_pp_rv2hv);
    break;
  }
- o = CALL_FPTR(old_ck)(aTHX_ o);
+ o = old_ck(aTHX_ o);
 
  if (hint & A_HINT_DO) {
   a_map_store_root(o, 0, hint);
@@ -955,7 +955,7 @@ STATIC OP *a_ck_root(pTHX_ OP *o) {
    enabled = hint & A_HINT_FETCH;
    break;
  }
- o = CALL_FPTR(old_ck)(aTHX_ o);
+ o = old_ck(aTHX_ o);
 
  if (hint & A_HINT_DO) {
   if (enabled) {
