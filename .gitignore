@@ -6,6 +6,8 @@ Makefile.old
 Build
 _build*
 
+MYMETA.yml
+
 *.tar.gz
 autovivification-*
 
