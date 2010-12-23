@@ -110,6 +110,8 @@ Turns off autovivification for lvalue dereferencing expressions, such as :
     $hashref->{$key} = $value
     for ($arrayref->[$idx]) { ... }
     for ($hashref->{$key}) { ... }
+    function($arrayref->[$idx])
+    function($hashref->{$key})
 
 An exception is thrown if vivification is needed to store the value, which means that effectively you can only assign to levels that are already defined
 In the example, this would require C<$arrayref> (resp. C<$hashref>) to already be an array (resp. hash) reference.

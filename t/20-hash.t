@@ -3,7 +3,7 @@
 use strict;
 use warnings;
 
-use Test::More tests => 9 * 3 * 290;
+use Test::More tests => 9 * 3 * 302;
 
 use lib 't/lib';
 use autovivification::TestCases;
@@ -115,6 +115,20 @@ $x->{a} = 1 # 1 for $x->{a}; () # '', undef, { a => 1 }             # +delete
 $x->{a} = 1 # 1 for $x->{b}; () # '', undef, { a => 1, b => undef } # +delete
 $x->{a} = 1 # 1 for $x->{a}; () # '', undef, { a => 1 }             # +store
 $x->{a} = 1 # 1 for $x->{b}; () # '', undef, { a => 1, b => undef } # +store
+
+$x # do_nothing($x->{a}); () # '', undef, { }
+$x # do_nothing($x->{a}); () # '', undef, { } #
+$x # do_nothing($x->{a}); () # '', undef, { } # +fetch
+$x # do_nothing($x->{a}); () # '', undef, { } # +exists
+$x # do_nothing($x->{a}); () # '', undef, { } # +delete
+$x # do_nothing($x->{a}); () # qr/^Can't vivify reference/, undef, undef # +store
+
+$x # set_arg($x->{a}); () # '', undef, { a => 1 }
+$x # set_arg($x->{a}); () # '', undef, { a => 1 } #
+$x # set_arg($x->{a}); () # '', undef, { a => 1 } # +fetch
+$x # set_arg($x->{a}); () # '', undef, { a => 1 } # +exists
+$x # set_arg($x->{a}); () # '', undef, { a => 1 } # +delete
+$x # set_arg($x->{a}); () # qr/^Can't vivify reference/, undef, undef # +store
 
 --- dereferencing ---
 

@@ -12,6 +12,10 @@ sub import {
 
 sub in_strict { (caller 0)[8] & (eval { strict::bits(@_) } || 0) };
 
+sub do_nothing { }
+
+sub set_arg { $_[0] = 1 }
+
 sub generate {
  my ($var, $init, $code, $exp, $use, $opts, $global) = @_;
  my $decl = $global ? "our $var; local $var;" : "my $var;";
