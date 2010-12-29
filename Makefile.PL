@@ -4,7 +4,34 @@ use strict;
 use warnings;
 use ExtUtils::MakeMaker;
 
+BEGIN {
+ local $@;
+ eval { require Config };
+ die 'OS unsupported' if $@;
+ Config->import(qw/%Config/);
+}
+
 my @DEFINES;
+my %macro;
+
+my $is_gcc_34 = 0;
+print "Checking if this is gcc 3.4 on Windows trying to link against an import library... ";
+if ($^O eq 'MSWin32' and not grep /^LD[A-Z]*=/, @ARGV) {
+ my ($libperl, $gccversion) = map $_ || '', @Config{qw/libperl gccversion/};
+ if ($gccversion =~ /^3\.4\.[0-9]+/ and $libperl =~ s/\.lib$//) {
+  $is_gcc_34 = 1;
+  my ($lddlflags, $ldflags) = @Config{qw/lddlflags ldflags/};
+  $_ ||= '', s/-L(?:".*?"|\S+)//g for $lddlflags, $ldflags;
+  $libperl = "-l$libperl";
+  my $libdirs = join ' ',
+                 map { s/(?<!\\)((?:\\\\)*")/\\$1/g; qq[-L"$_"] }
+                  @Config{qw/bin sitebin/};
+  $macro{LDDLFLAGS}    = "$lddlflags $libdirs $libperl";
+  $macro{LDFLAGS}      = "$ldflags $libdirs $libperl";
+  $macro{PERL_ARCHIVE} = '',
+ }
+}
+print $is_gcc_34 ? "yes\n" : "no\n";
 
 # Threads, Windows and 5.8.x don't seem to be best friends
 if ($^O eq 'MSWin32' && $^V lt v5.9.0) {
@@ -17,6 +44,7 @@ if ($^O eq 'MSWin32' && $^V lt v5.10.1) {
 }
 
 @DEFINES = (DEFINE => join ' ', @DEFINES) if @DEFINES;
+%macro   = (macro  => { %macro })         if %macro; # Beware of the circle
 
 my $dist = 'autovivification';
 
@@ -65,4 +93,5 @@ WriteMakefile(
  clean            => {
   FILES => "$dist-* *.gcov *.gcda *.gcno cover_db Debian_CPANTS.txt"
  },
+ %macro,
 );
