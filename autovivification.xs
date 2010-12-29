@@ -389,7 +389,7 @@ STATIC void a_map_delete(pTHX_ const OP *o) {
  MUTEX_LOCK(&a_op_map_mutex);
 #endif
 
- ptable_map_store(a_op_map, o, NULL);
+ ptable_map_delete(a_op_map, o);
 
 #ifdef USE_ITHREADS
  MUTEX_UNLOCK(&a_op_map_mutex);
