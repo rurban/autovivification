@@ -3,7 +3,7 @@ package autovivification::TestCases;
 use strict;
 use warnings;
 
-use Test::More;
+use Test::Leaner;
 
 sub import {
  no strict 'refs';

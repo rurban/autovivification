@@ -3,13 +3,13 @@
 use strict;
 use warnings;
 
-use Test::More;
+use lib 't/lib';
+use Test::Leaner;
 
 BEGIN {
  plan tests => 9 * 3 * 64;
 }
 
-use lib 't/lib';
 use autovivification::TestCases;
 
 while (<DATA>) {

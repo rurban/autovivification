@@ -3,9 +3,9 @@
 use strict;
 use warnings;
 
-use Test::More tests => 9 * 3 * 302;
-
 use lib 't/lib';
+use Test::Leaner tests => 9 * 3 * 302;
+
 use autovivification::TestCases;
 
 while (<DATA>) {

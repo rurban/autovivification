@@ -3,13 +3,13 @@
 use strict;
 use warnings;
 
-use Test::More;
+use lib 't/lib';
+use Test::Leaner;
 
 BEGIN {
  if ($] >= 5.011) { plan tests => 9 * 3 * 64 } else { plan skip_all => 'perl 5.11 required for keys/values @array' }
 }
 
-use lib 't/lib';
 use autovivification::TestCases;
 
 while (<DATA>) {
