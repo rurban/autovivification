@@ -329,10 +329,13 @@ STATIC ptable *a_op_map = NULL;
 
 STATIC perl_mutex a_op_map_mutex;
 
+#define A_LOCK(M)   MUTEX_LOCK(M)
+#define A_UNLOCK(M) MUTEX_UNLOCK(M)
+
 STATIC const a_op_info *a_map_fetch(const OP *o, a_op_info *oi) {
  const a_op_info *val;
 
- MUTEX_LOCK(&a_op_map_mutex);
+ A_LOCK(&a_op_map_mutex);
 
  val = ptable_fetch(a_op_map, o);
  if (val) {
@@ -340,7 +343,7 @@ STATIC const a_op_info *a_map_fetch(const OP *o, a_op_info *oi) {
   val = oi;
  }
 
- MUTEX_UNLOCK(&a_op_map_mutex);
+ A_UNLOCK(&a_op_map_mutex);
 
  return val;
 }
@@ -350,6 +353,9 @@ STATIC const a_op_info *a_map_fetch(const OP *o, a_op_info *oi) {
 #else /* USE_ITHREADS */
 
 #define dA_MAP_THX dNOOP
+
+#define A_LOCK(M)   NOOP
+#define A_UNLOCK(M) NOOP
 
 #define a_map_fetch(O) ptable_fetch(a_op_map, (O))
 
@@ -373,29 +379,20 @@ STATIC const a_op_info *a_map_store_locked(pPTBLMS_ const OP *o, OP *(*old_pp)(p
 
 STATIC void a_map_store(pPTBLMS_ const OP *o, OP *(*old_pp)(pTHX), void *next, UV flags) {
 #define a_map_store(O, PP, N, F) a_map_store(aPTBLMS_ (O), (PP), (N), (F))
-
-#ifdef USE_ITHREADS
- MUTEX_LOCK(&a_op_map_mutex);
-#endif
+ A_LOCK(&a_op_map_mutex);
 
  a_map_store_locked(o, old_pp, next, flags);
 
-#ifdef USE_ITHREADS
- MUTEX_UNLOCK(&a_op_map_mutex);
-#endif
+ A_UNLOCK(&a_op_map_mutex);
 }
 
 STATIC void a_map_delete(pTHX_ const OP *o) {
 #define a_map_delete(O) a_map_delete(aTHX_ (O))
-#ifdef USE_ITHREADS
- MUTEX_LOCK(&a_op_map_mutex);
-#endif
+ A_LOCK(&a_op_map_mutex);
 
  ptable_map_delete(a_op_map, o);
 
-#ifdef USE_ITHREADS
- MUTEX_UNLOCK(&a_op_map_mutex);
-#endif
+ A_UNLOCK(&a_op_map_mutex);
 }
 
 STATIC const OP *a_map_descend(const OP *o) {
@@ -419,9 +416,7 @@ STATIC void a_map_store_root(pPTBLMS_ const OP *root, OP *(*old_pp)(pTHX), UV fl
  a_op_info *oi;
  const OP *o = root;
 
-#ifdef USE_ITHREADS
- MUTEX_LOCK(&a_op_map_mutex);
-#endif
+ A_LOCK(&a_op_map_mutex);
 
  roi = a_map_store_locked(o, old_pp, (OP *) root, flags | A_HINT_ROOT);
 
@@ -436,9 +431,7 @@ STATIC void a_map_store_root(pPTBLMS_ const OP *root, OP *(*old_pp)(pTHX), UV fl
   }
  }
 
-#ifdef USE_ITHREADS
- MUTEX_UNLOCK(&a_op_map_mutex);
-#endif
+ A_UNLOCK(&a_op_map_mutex);
 
  return;
 }
@@ -447,9 +440,7 @@ STATIC void a_map_update_flags_topdown(const OP *root, UV flags) {
  a_op_info *oi;
  const OP *o = root;
 
-#ifdef USE_ITHREADS
- MUTEX_LOCK(&a_op_map_mutex);
-#endif
+ A_LOCK(&a_op_map_mutex);
 
  flags &= ~A_HINT_ROOT;
 
@@ -461,9 +452,7 @@ STATIC void a_map_update_flags_topdown(const OP *root, UV flags) {
   o = a_map_descend(o);
  } while (o);
 
-#ifdef USE_ITHREADS
- MUTEX_UNLOCK(&a_op_map_mutex);
-#endif
+ A_UNLOCK(&a_op_map_mutex);
 
  return;
 }
@@ -473,9 +462,7 @@ STATIC void a_map_update_flags_topdown(const OP *root, UV flags) {
 STATIC void a_map_update_flags_bottomup(const OP *o, UV flags, UV rflags) {
  a_op_info *oi;
 
-#ifdef USE_ITHREADS
- MUTEX_LOCK(&a_op_map_mutex);
-#endif
+ A_LOCK(&a_op_map_mutex);
 
  flags  &= ~A_HINT_ROOT;
  rflags |=  A_HINT_ROOT;
@@ -487,9 +474,7 @@ STATIC void a_map_update_flags_bottomup(const OP *o, UV flags, UV rflags) {
  }
  oi->flags = rflags;
 
-#ifdef USE_ITHREADS
- MUTEX_UNLOCK(&a_op_map_mutex);
-#endif
+ A_UNLOCK(&a_op_map_mutex);
 
  return;
 }
