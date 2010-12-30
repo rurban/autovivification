@@ -1077,8 +1077,8 @@ MODULE = autovivification      PACKAGE = autovivification
 
 PROTOTYPES: ENABLE
 
-BOOT: 
-{                                    
+BOOT:
+{
  if (!a_booted++) {
   HV *stash;
 
