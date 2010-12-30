@@ -27,7 +27,16 @@ BEGIN {
  require autovivification;
  skipall 'This autovivification isn\'t thread safe'
                                         unless autovivification::A_THREADSAFE();
- plan tests => 10 * 2 * 3 * (1 + 2);
+}
+
+my ($threads, $runs);
+BEGIN {
+ $threads = 10;
+ $runs    = 2;
+}
+
+BEGIN {
+ plan tests => $threads * $runs * 3 * (1 + 2);
  defined and diag "Using threads $_" for $threads::VERSION;
 }
 
@@ -37,7 +46,7 @@ BEGIN {
  sub try {
   my $tid = threads->tid();
 
-  for my $run (1 .. 2) {
+  for my $run (1 .. $runs) {
    {
     my $x;
     my $y = $x->{foo};
@@ -81,5 +90,5 @@ SKIP:
  }
 }
 
-my @t = map threads->create(\&try), 1 .. 10;
+my @t = map threads->create(\&try), 1 .. $threads;
 $_->join for @t;
