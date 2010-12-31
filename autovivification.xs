@@ -293,7 +293,7 @@ STATIC UV a_detag(pTHX_ const SV *hint) {
      ? SvUVX(H)    \
      : (SvPOK(H)   \
         ? sv_2uv(SvLEN(H) ? (H) : sv_mortalcopy(H)) \
-	: 0        \
+        : 0        \
        )           \
      )             \
   : 0)
