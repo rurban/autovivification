@@ -21,8 +21,6 @@
 
 #define A_HAS_PERL(R, V, S) (PERL_REVISION > (R) || (PERL_REVISION == (R) && (PERL_VERSION > (V) || (PERL_VERSION == (V) && (PERL_SUBVERSION >= (S))))))
 
-#define A_HAS_PERL_EXACT(R, V, S) ((PERL_REVISION == (R)) && (PERL_VERSION == (V)) && (PERL_SUBVERSION == (S)))
-
 #undef ENTERn
 #if defined(ENTER_with_name) && !A_HAS_PERL(5, 11, 4)
 # define ENTERn(N) ENTER_with_name(N)
@@ -615,8 +613,6 @@ STATIC OP *a_pp_rv2av(pTHX) {
    PUSHs(av);
    RETURN;
   }
- } else {
-  PL_op->op_ppaddr = oi->old_pp;
  }
 
  return oi->old_pp(aTHX);
@@ -634,8 +630,6 @@ STATIC OP *a_pp_rv2hv_simple(pTHX) {
  if (oi->flags & A_HINT_DEREF) {
   if (a_undef(TOPs))
    RETURN;
- } else {
-  PL_op->op_ppaddr = oi->old_pp;
  }
 
  return oi->old_pp(aTHX);
@@ -656,8 +650,6 @@ STATIC OP *a_pp_rv2hv(pTHX) {
    PUSHs(hv);
    RETURN;
   }
- } else {
-  PL_op->op_ppaddr = oi->old_pp;
  }
 
  return oi->old_pp(aTHX);
@@ -672,17 +664,12 @@ STATIC OP *a_pp_deref(pTHX) {
  dSP;
 
  oi = a_map_fetch(PL_op);
- flags = oi->flags;
 
+ flags = oi->flags;
  if (flags & A_HINT_DEREF) {
   OP *o;
-  U8 old_private;
 
-deref:
-  old_private       = PL_op->op_private;
-  PL_op->op_private = ((old_private & ~OPpDEREF) | OPpLVAL_DEFER);
   o = oi->old_pp(aTHX);
-  PL_op->op_private = old_private;
 
   if (flags & (A_HINT_NOTIFY|A_HINT_STORE)) {
    SPAGAIN;
@@ -697,20 +684,7 @@ deref:
   }
 
   return o;
- } else if ((flags & ~A_HINT_ROOT)
-                    && (PL_op->op_private & OPpDEREF || flags & A_HINT_ROOT)) {
-  /* Decide if the expression must autovivify or not.
-   * This branch should be called only once by expression. */
-  flags = a_map_resolve(PL_op, oi);
-
-  /* We need the updated flags value in the deref branch. */
-  if (flags & A_HINT_DEREF)
-   goto deref;
  }
-
- /* This op doesn't need to skip autovivification, so restore the original
-  * state. */
- PL_op->op_ppaddr = oi->old_pp;
 
  return oi->old_pp(aTHX);
 }
@@ -995,7 +969,6 @@ A_PEEP_REC_PROTO {
 # define a_peep_rec(O) a_peep_rec(aTHX_ (O))
 #endif /* A_HAS_RPEEP */
  dA_MAP_THX;
- const a_op_info *oi;
 
 #if !A_HAS_RPEEP
  if (ptable_fetch(seen, o))
@@ -1003,6 +976,9 @@ A_PEEP_REC_PROTO {
 #endif
 
  for (; o; o = o->op_next) {
+  const a_op_info *oi = NULL;
+  UV flags = 0;
+
 #if !A_HAS_RPEEP
   ptable_seen_store(seen, o, o);
 #endif
@@ -1015,6 +991,39 @@ A_PEEP_REC_PROTO {
       o->op_ppaddr = a_pp_deref;
      }
     }
+    /* FALLTHROUGH */
+   case OP_AELEM:
+   case OP_AELEMFAST:
+   case OP_HELEM:
+   case OP_RV2SV:
+    if (o->op_ppaddr != a_pp_deref)
+     break;
+    oi = a_map_fetch(o);
+    if (!oi)
+     break;
+    flags = oi->flags;
+    if (!(flags & A_HINT_DEREF)
+        && (flags & A_HINT_DO)
+        && (o->op_private & OPpDEREF || flags & A_HINT_ROOT)) {
+     /* Decide if the expression must autovivify or not. */
+     flags = a_map_resolve(o, oi);
+    }
+    if (flags & A_HINT_DEREF)
+     o->op_private = ((o->op_private & ~OPpDEREF) | OPpLVAL_DEFER);
+    else
+     o->op_ppaddr  = oi->old_pp;
+    break;
+   case OP_RV2AV:
+   case OP_RV2HV:
+    if (   o->op_ppaddr != a_pp_rv2av
+        && o->op_ppaddr != a_pp_rv2hv
+        && o->op_ppaddr != a_pp_rv2hv_simple)
+     break;
+    oi = a_map_fetch(o);
+    if (!oi)
+     break;
+    if (!(oi->flags & A_HINT_DEREF))
+     o->op_ppaddr  = oi->old_pp;
     break;
 #if !A_HAS_RPEEP
    case OP_MAPWHILE:
@@ -1064,15 +1073,8 @@ STATIC void a_peep(pTHX_ OP *o) {
  ptable_seen_clear(seen);
 #endif /* !A_HAS_RPEEP */
 
-#if A_HAS_PERL_EXACT(5, 8, 2)
- /* 5.8.2's peephole optimizer has a naughty bug with stub ops coming from
-  * sub { }. */
- a_peep_rec(o);
- a_old_peep(aTHX_ o);
-#else
  a_old_peep(aTHX_ o);
  a_peep_rec(o);
-#endif
 }
 
 /* --- Interpreter setup/teardown ------------------------------------------ */

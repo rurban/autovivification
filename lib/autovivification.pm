@@ -1,6 +1,6 @@
 package autovivification;
 
-use 5.008001;
+use 5.008003;
 
 use strict;
 use warnings;
@@ -198,7 +198,7 @@ If warnings are turned on, Perl will complain about one-element slices.
 
 =head1 DEPENDENCIES
 
-L<perl> 5.8.1.
+L<perl> 5.8.3.
 
 L<XSLoader> (standard since perl 5.006).
 
