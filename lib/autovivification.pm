@@ -200,6 +200,9 @@ If warnings are turned on, Perl will complain about one-element slices.
 
 L<perl> 5.8.3.
 
+A C compiler.
+This module may happen to build with a C++ compiler as well, but don't rely on it, as no guarantee is made in this regard.
+
 L<XSLoader> (standard since perl 5.006).
 
 =head1 SEE ALSO
