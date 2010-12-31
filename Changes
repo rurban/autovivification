@@ -1,5 +1,28 @@
 Revision history for autovivification
 
+0.07    2010-12-31 16:20 UTC
+        + Chg : perl 5.8.3 is required.
+        + Doc : Complements and clarifications.
+        + Fix : Segmentation faults and misbehaviours in threaded applications.
+        + Fix : Compatibility with perl 5.13.7.
+                Thanks Andreas J. König for reporting and Andrew Main for
+                providing a fix.
+        + Fix : Broken linkage on Windows with gcc 3.4, which appears in
+                particular when using ActivePerl's default compiler suite.
+                For those setups, the autovivification shared library will now
+                be linked against the perl dll directly (instead of the import
+                library).
+        + Opt : The pragma takes slightly more time at compile-time, but is
+                slightly faster at run-time.
+        + Tst : Lengthy tests have been ported to Test::Leaner, making the
+                whole test suite about 50% faster.
+        + Tst : Threads tests are now only run on perl 5.13.4 and higher.
+                They could segfault randomly because of what seems to be an
+                internal bug of Perl, which has been addressed in 5.13.4.
+                There is also an environment variable that allows you to
+                forcefully run those tests, but it should be set only for
+                author testing and not for end users.
+
 0.06    2010-04-24 17:40 UTC
         + Add : The A_THREADSAFE and A_FORKSAFE constants.
         + Fix : [RT #56870] : "no autovivification" vs Regexp::Common.
