@@ -21,6 +21,8 @@
 
 #define A_HAS_PERL(R, V, S) (PERL_REVISION > (R) || (PERL_REVISION == (R) && (PERL_VERSION > (V) || (PERL_VERSION == (V) && (PERL_SUBVERSION >= (S))))))
 
+#define A_HAS_PERL_EXACT(R, V, S) ((PERL_REVISION == (R)) && (PERL_VERSION == (V)) && (PERL_SUBVERSION == (S)))
+
 #undef ENTERn
 #if defined(ENTER_with_name) && !A_HAS_PERL(5, 11, 4)
 # define ENTERn(N) ENTER_with_name(N)
@@ -37,6 +39,10 @@
 
 #ifndef A_WORKAROUND_REQUIRE_PROPAGATION
 # define A_WORKAROUND_REQUIRE_PROPAGATION !A_HAS_PERL(5, 10, 1)
+#endif
+
+#ifndef A_HAS_RPEEP
+# define A_HAS_RPEEP A_HAS_PERL(5, 13, 5)
 #endif
 
 /* ... Thread safety and multiplicity ...................................... */
@@ -57,7 +63,8 @@
 #  define A_MULTIPLICITY 0
 # endif
 #endif
-#if A_MULTIPLICITY && !defined(tTHX)
+
+#ifndef tTHX
 # define tTHX PerlInterpreter*
 #endif
 
@@ -112,14 +119,40 @@ typedef struct {
 #define ptable_hints_store(T, K, V) ptable_hints_store(aTHX_ (T), (K), (V))
 #define ptable_hints_free(T)        ptable_hints_free(aTHX_ (T))
 
+#endif /* A_THREADSAFE */
+
+#endif /* A_WORKAROUND_REQUIRE_PROPAGATION */
+
+#if !A_HAS_RPEEP
+
+#define PTABLE_NAME        ptable_seen
+#define PTABLE_VAL_FREE(V) NOOP
+
+#include "ptable.h"
+
+#endif /* !A_HAS_RPEEP */
+
+#define A_NEED_CXT ((A_THREADSAFE && A_WORKAROUND_REQUIRE_PROPAGATION) || !A_HAS_RPEEP)
+
+#if A_NEED_CXT
+
 #define MY_CXT_KEY __PACKAGE__ "::_guts" XS_VERSION
 
 typedef struct {
+#if A_THREADSAFE && A_WORKAROUND_REQUIRE_PROPAGATION
  ptable *tbl;   /* It really is a ptable_hints */
  tTHX    owner;
+#endif /* A_THREADSAFE && A_WORKAROUND_REQUIRE_PROPAGATION */
+#if !A_HAS_RPEEP
+ ptable *seen;  /* It really is a ptable_seen */
+#endif /* !A_HAS_RPEEP */
 } my_cxt_t;
 
 START_MY_CXT
+
+#if A_THREADSAFE
+
+#if A_WORKAROUND_REQUIRE_PROPAGATION
 
 typedef struct {
  ptable *tbl;
@@ -158,15 +191,26 @@ STATIC void a_ptable_clone(pTHX_ ptable_ent *ent, void *ud_) {
  ptable_hints_store(ud->tbl, ent->key, h2);
 }
 
+#endif /* A_WORKAROUND_REQUIRE_PROPAGATION */
+
 #include "reap.h"
 
 STATIC void a_thread_cleanup(pTHX_ void *ud) {
  dMY_CXT;
 
+#if A_WORKAROUND_REQUIRE_PROPAGATION
  ptable_hints_free(MY_CXT.tbl);
+#endif /* A_WORKAROUND_REQUIRE_PROPAGATION */
+#if !A_HAS_RPEEP
+ ptable_seen_free(MY_CXT.seen);
+#endif /* !A_HAS_RPEEP */
 }
 
 #endif /* A_THREADSAFE */
+
+#endif /* A_NEED_CXT */
+
+#if A_WORKAROUND_REQUIRE_PROPAGATION
 
 STATIC IV a_require_tag(pTHX) {
 #define a_require_tag() a_require_tag(aTHX)
@@ -215,7 +259,9 @@ get_enclosing_cv:
 STATIC SV *a_tag(pTHX_ UV bits) {
 #define a_tag(B) a_tag(aTHX_ (B))
  a_hint_t *h;
+#if A_THREADSAFE
  dMY_CXT;
+#endif
 
  h              = PerlMemShared_malloc(sizeof *h);
  h->bits        = bits;
@@ -234,7 +280,9 @@ STATIC SV *a_tag(pTHX_ UV bits) {
 STATIC UV a_detag(pTHX_ const SV *hint) {
 #define a_detag(H) a_detag(aTHX_ (H))
  a_hint_t *h;
+#if A_THREADSAFE
  dMY_CXT;
+#endif
 
  if (!(hint && SvIOK(hint)))
   return 0;
@@ -728,49 +776,22 @@ STATIC void a_recheck_rv2xv(pTHX_ OP *o, OPCODE type, OP *(*new_pp)(pTHX)) {
 
 /* ... ck_pad{any,sv} ...................................................... */
 
-/* Sadly, the PADSV OPs we are interested in don't trigger the padsv check
- * function, but are instead manually mutated from a PADANY. This is why we set
- * PL_ppaddr[OP_PADSV] in the padany check function so that PADSV OPs will have
- * their op_ppaddr set to our pp_padsv. PL_ppaddr[OP_PADSV] is then reset at the
- * beginning of every ck_pad{any,sv}. Some unwanted OPs can still call our
- * pp_padsv, but much less than if we would have set PL_ppaddr[OP_PADSV]
- * globally. */
-
-STATIC OP *(*a_pp_padsv_saved)(pTHX) = 0;
-
-STATIC void a_pp_padsv_save(void) {
- if (a_pp_padsv_saved)
-  return;
-
- a_pp_padsv_saved    = PL_ppaddr[OP_PADSV];
- PL_ppaddr[OP_PADSV] = a_pp_deref;
-}
-
-STATIC void a_pp_padsv_restore(OP *o) {
- if (!a_pp_padsv_saved)
-  return;
-
- if (o->op_ppaddr == a_pp_deref)
-  o->op_ppaddr = a_pp_padsv_saved;
-
- PL_ppaddr[OP_PADSV] = a_pp_padsv_saved;
- a_pp_padsv_saved    = 0;
-}
+/* Sadly, the padsv OPs we are interested in don't trigger the padsv check
+ * function, but are instead manually mutated from a padany. So we store
+ * the op entry in the op map in the padany check function, and we set their
+ * op_ppaddr member in our peephole optimizer replacement below. */
 
 STATIC OP *(*a_old_ck_padany)(pTHX_ OP *) = 0;
 
 STATIC OP *a_ck_padany(pTHX_ OP *o) {
  UV hint;
 
- a_pp_padsv_restore(o);
-
  o = a_old_ck_padany(aTHX_ o);
 
  hint = a_hint();
- if (hint & A_HINT_DO) {
-  a_pp_padsv_save();
-  a_map_store_root(o, a_pp_padsv_saved, hint);
- } else
+ if (hint & A_HINT_DO)
+  a_map_store_root(o, o->op_ppaddr, hint);
+ else
   a_map_delete(o);
 
  return o;
@@ -780,8 +801,6 @@ STATIC OP *(*a_old_ck_padsv)(pTHX_ OP *) = 0;
 
 STATIC OP *a_ck_padsv(pTHX_ OP *o) {
  UV hint;
-
- a_pp_padsv_restore(o);
 
  o = a_old_ck_padsv(aTHX_ o);
 
@@ -958,6 +977,106 @@ STATIC OP *a_ck_root(pTHX_ OP *o) {
  return o;
 }
 
+/* ... Our peephole optimizer .............................................. */
+
+STATIC peep_t a_old_peep = 0; /* This is actually the rpeep past 5.13.5 */
+
+#if !A_HAS_RPEEP
+# define A_PEEP_REC_PROTO STATIC void a_peep_rec(pTHX_ OP *o, ptable *seen)
+#else /* !A_HAS_RPEEP */
+# define A_PEEP_REC_PROTO STATIC void a_peep_rec(pTHX_ OP *o)
+#endif /* A_HAS_RPEEP */
+
+A_PEEP_REC_PROTO;
+A_PEEP_REC_PROTO {
+#if !A_HAS_RPEEP
+# define a_peep_rec(O) a_peep_rec(aTHX_ (O), seen)
+#else /* !A_HAS_RPEEP */
+# define a_peep_rec(O) a_peep_rec(aTHX_ (O))
+#endif /* A_HAS_RPEEP */
+ dA_MAP_THX;
+ const a_op_info *oi;
+
+#if !A_HAS_RPEEP
+ if (ptable_fetch(seen, o))
+  return;
+#endif
+
+ for (; o; o = o->op_next) {
+#if !A_HAS_RPEEP
+  ptable_seen_store(seen, o, o);
+#endif
+  switch (o->op_type) {
+   case OP_PADSV:
+    if (o->op_ppaddr != a_pp_deref) {
+     oi = a_map_fetch(o);
+     if (oi && (oi->flags & A_HINT_DO)) {
+      a_map_store(o, o->op_ppaddr, oi->next, oi->flags);
+      o->op_ppaddr = a_pp_deref;
+     }
+    }
+    break;
+#if !A_HAS_RPEEP
+   case OP_MAPWHILE:
+   case OP_GREPWHILE:
+   case OP_AND:
+   case OP_OR:
+   case OP_ANDASSIGN:
+   case OP_ORASSIGN:
+   case OP_COND_EXPR:
+   case OP_RANGE:
+# if A_HAS_PERL(5, 10, 0)
+   case OP_ONCE:
+   case OP_DOR:
+   case OP_DORASSIGN:
+# endif
+    a_peep_rec(cLOGOPo->op_other);
+    break;
+   case OP_ENTERLOOP:
+   case OP_ENTERITER:
+    a_peep_rec(cLOOPo->op_redoop);
+    a_peep_rec(cLOOPo->op_nextop);
+    a_peep_rec(cLOOPo->op_lastop);
+    break;
+# if A_HAS_PERL(5, 9, 5)
+   case OP_SUBST:
+    a_peep_rec(cPMOPo->op_pmstashstartu.op_pmreplstart);
+    break;
+# else
+   case OP_QR:
+   case OP_MATCH:
+   case OP_SUBST:
+    a_peep_rec(cPMOPo->op_pmreplstart);
+    break;
+# endif
+#endif /* !A_HAS_RPEEP */
+   default:
+    break;
+  }
+ }
+}
+
+STATIC void a_peep(pTHX_ OP *o) {
+#if !A_HAS_RPEEP
+ dMY_CXT;
+ ptable *seen = MY_CXT.seen;
+
+ ptable_seen_clear(seen);
+#endif /* !A_HAS_RPEEP */
+
+#if A_HAS_PERL_EXACT(5, 8, 2)
+ /* 5.8.2's peephole optimizer has a naughty bug with stub ops coming from
+  * sub { }. */
+ a_peep_rec(o);
+ a_old_peep(aTHX_ o);
+#else
+ a_old_peep(aTHX_ o);
+ a_peep_rec(o);
+#endif
+}
+
+/* --- Interpreter setup/teardown ------------------------------------------ */
+
 STATIC U32 a_initialized = 0;
 
 STATIC void a_teardown(pTHX_ void *root) {
@@ -970,12 +1089,17 @@ STATIC void a_teardown(pTHX_ void *root) {
   return;
 #endif
 
-#if A_THREADSAFE && A_WORKAROUND_REQUIRE_PROPAGATION
+#if A_NEED_CXT
  {
   dMY_CXT;
+# if A_THREADSAFE && A_WORKAROUND_REQUIRE_PROPAGATION
   ptable_hints_free(MY_CXT.tbl);
+# endif /* A_THREADSAFE && A_WORKAROUND_REQUIRE_PROPAGATION */
+# if !A_HAS_RPEEP
+  ptable_seen_free(MY_CXT.seen);
+# endif /* !A_HAS_RPEEP */
  }
-#endif
+#endif /* A_NEED_CXT */
 
  PL_check[OP_PADANY] = MEMBER_TO_FPTR(a_old_ck_padany);
  a_old_ck_padany     = 0;
@@ -1008,10 +1132,12 @@ STATIC void a_teardown(pTHX_ void *root) {
  PL_check[OP_VALUES] = MEMBER_TO_FPTR(a_old_ck_values);
  a_old_ck_values     = 0;
 
- if (a_pp_padsv_saved) {
-  PL_ppaddr[OP_PADSV] = a_pp_padsv_saved;
-  a_pp_padsv_saved    = 0;
- }
+#if A_HAS_RPEEP
+ PL_rpeepp  = a_old_peep;
+#else
+ PL_peepp   = a_old_peep;
+#endif
+ a_old_peep = 0;
 
  a_initialized = 0;
 }
@@ -1021,13 +1147,18 @@ STATIC void a_setup(pTHX) {
  if (a_initialized)
   return;
 
-#if A_THREADSAFE && A_WORKAROUND_REQUIRE_PROPAGATION
+#if A_NEED_CXT
  {
   MY_CXT_INIT;
+# if A_THREADSAFE && A_WORKAROUND_REQUIRE_PROPAGATION
   MY_CXT.tbl   = ptable_new();
   MY_CXT.owner = aTHX;
+# endif /* A_THREADSAFE && A_WORKAROUND_REQUIRE_PROPAGATION */
+# if !A_HAS_RPEEP
+  MY_CXT.seen  = ptable_new();
+# endif /* !A_RPEEP */
  }
-#endif
+#endif /* A_NEED_CXT */
 
  a_old_ck_padany     = PL_check[OP_PADANY];
  PL_check[OP_PADANY] = MEMBER_TO_FPTR(a_ck_padany);
@@ -1059,6 +1190,14 @@ STATIC void a_setup(pTHX) {
  PL_check[OP_KEYS]   = MEMBER_TO_FPTR(a_ck_root);
  a_old_ck_values     = PL_check[OP_VALUES];
  PL_check[OP_VALUES] = MEMBER_TO_FPTR(a_ck_root);
+
+#if A_HAS_RPEEP
+ a_old_peep = PL_rpeepp;
+ PL_rpeepp  = a_peep;
+#else
+ a_old_peep = PL_peepp;
+ PL_peepp   = a_peep;
+#endif
 
 #if A_MULTIPLICITY
  call_atexit(a_teardown, aTHX);
@@ -1104,27 +1243,44 @@ BOOT:
  a_setup();
 }
 
-#if A_THREADSAFE && A_WORKAROUND_REQUIRE_PROPAGATION
+#if A_THREADSAFE && (A_WORKAROUND_REQUIRE_PROPAGATION || !A_HAS_RPEEP)
 
 void
 CLONE(...)
 PROTOTYPE: DISABLE
 PREINIT:
+#if A_WORKAROUND_REQUIRE_PROPAGATION
  ptable *t;
+#endif
+#if !A_HAS_RPEEP
+ ptable *s;
+#endif
 PPCODE:
  {
-  a_ptable_clone_ud ud;
   dMY_CXT;
+#if A_WORKAROUND_REQUIRE_PROPAGATION
+  {
+   a_ptable_clone_ud ud;
 
-  t = ptable_new();
-  a_ptable_clone_ud_init(ud, t, MY_CXT.owner);
-  ptable_walk(MY_CXT.tbl, a_ptable_clone, &ud);
-  a_ptable_clone_ud_deinit(ud);
+   t = ptable_new();
+   a_ptable_clone_ud_init(ud, t, MY_CXT.owner);
+   ptable_walk(MY_CXT.tbl, a_ptable_clone, &ud);
+   a_ptable_clone_ud_deinit(ud);
+  }
+#endif
+#if !A_HAS_RPEEP
+  s = ptable_new();
+#endif
  }
  {
   MY_CXT_CLONE;
+#if A_WORKAROUND_REQUIRE_PROPAGATION
   MY_CXT.tbl   = t;
   MY_CXT.owner = aTHX;
+#endif
+#if !A_HAS_RPEEP
+  MY_CXT.seen  = s;
+#endif
  }
  reap(3, a_thread_cleanup, NULL);
  XSRETURN(0);
