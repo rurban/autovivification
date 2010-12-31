@@ -21,20 +21,6 @@
 
 #define A_HAS_PERL(R, V, S) (PERL_REVISION > (R) || (PERL_REVISION == (R) && (PERL_VERSION > (V) || (PERL_VERSION == (V) && (PERL_SUBVERSION >= (S))))))
 
-#undef ENTERn
-#if defined(ENTER_with_name) && !A_HAS_PERL(5, 11, 4)
-# define ENTERn(N) ENTER_with_name(N)
-#else
-# define ENTERn(N) ENTER
-#endif
-
-#undef LEAVEn
-#if defined(LEAVE_with_name) && !A_HAS_PERL(5, 11, 4)
-# define LEAVEn(N) LEAVE_with_name(N)
-#else
-# define LEAVEn(N) LEAVE
-#endif
-
 #ifndef A_WORKAROUND_REQUIRE_PROPAGATION
 # define A_WORKAROUND_REQUIRE_PROPAGATION !A_HAS_PERL(5, 10, 1)
 #endif
