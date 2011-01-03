@@ -132,7 +132,7 @@ Throws an exception when an autovivification is avoided.
 
 Each call to C<unimport> adds the specified features to the ones already in use in the current lexical scope.
 
-When C<@opts> is empty, it defaults to C<qw/fetch exists delete/>.
+When C<@opts> is empty, it defaults to C<< qw<fetch exists delete> >>.
 
 =cut
 
@@ -148,7 +148,7 @@ my %bits = (
 sub unimport {
  shift;
  my $hint = _detag($^H{+(__PACKAGE__)}) || 0;
- @_ = qw/fetch exists delete/ unless @_;
+ @_ = qw<fetch exists delete> unless @_;
  $hint |= $bits{$_} for grep exists $bits{$_}, @_;
  $^H |= 0x00020000;
  $^H{+(__PACKAGE__)} = _tag($hint);

@@ -12,7 +12,7 @@ use lib 't/lib';
  my $x;
  my $res = eval {
   local $SIG{__WARN__} = sub { push @w, join '', 'warn:', @_ };
-  no autovivification qw/warn fetch/;
+  no autovivification qw<warn fetch>;
   $x->{a};
  };
  is   @w,    1,     'warned only once';

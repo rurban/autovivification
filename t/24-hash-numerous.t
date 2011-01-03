@@ -48,7 +48,7 @@ my $n = 100;
  {
   my @r;
   no autovivification;
-  @r = @{$x}{qw/a b/} for 1 .. $n;
+  @r = @{$x}{qw<a b>} for 1 .. $n;
  }
  is_deeply $x, undef, 'numerous slices from an undef lexical';
 
@@ -56,7 +56,7 @@ my $n = 100;
  {
   my @r;
   no autovivification;
-  @r = @{$x->{a}}{qw/b c/} for 1 .. $n;
+  @r = @{$x->{a}}{qw<b c>} for 1 .. $n;
  }
  is_deeply $x, { a => undef }, 'numerous slices from a 1-level hashref lexical';
 }
@@ -66,7 +66,7 @@ my $n = 100;
  {
   my @r;
   no autovivification;
-  @r = @{$x}{qw/a b/} for 1 .. $n;
+  @r = @{$x}{qw<a b>} for 1 .. $n;
  }
  is_deeply $x, undef, 'numerous slices from an undef global';
 
@@ -74,7 +74,7 @@ my $n = 100;
  {
   my @r;
   no autovivification;
-  @r = @{$x->{a}}{qw/b c/} for 1 .. $n;
+  @r = @{$x->{a}}{qw<b c>} for 1 .. $n;
  }
  is_deeply $x, { a => undef }, 'numerous slices from a 1-level hashref global';
 }

@@ -1,5 +1,5 @@
 package autovivification::TestRequired5::a0;
-no autovivification qw/strict fetch/;
+no autovivification qw<strict fetch>;
 use autovivification::TestRequired5::b0;
 sub error {
  local $@;

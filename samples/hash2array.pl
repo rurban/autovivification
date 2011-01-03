@@ -3,8 +3,8 @@
 use strict;
 use warnings;
 
-use Fatal qw/open close/;
-use Text::Balanced qw/extract_bracketed/;
+use Fatal qw<open close>;
+use Text::Balanced qw<extract_bracketed>;
 
 open my $hash_t,       '<', 't/20-hash.t';
 open my $array_t,      '>', 't/30-array.t';

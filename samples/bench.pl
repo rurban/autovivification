@@ -3,7 +3,7 @@
 use strict;
 use warnings;
 
-use Benchmark qw/:hireswallclock cmpthese/;
+use Benchmark qw<:hireswallclock cmpthese>;
 
 use blib;
 

@@ -14,7 +14,7 @@ if (eval 'use B::Deparse; 1') {
 my $bd = B::Deparse->new;
 
 {
- no autovivification qw/fetch strict/;
+ no autovivification qw<fetch strict>;
 
  sub blech { my $key = $_[0]->{key} }
 }
