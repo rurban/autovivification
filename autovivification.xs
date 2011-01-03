@@ -114,6 +114,11 @@ typedef struct {
 
 #include "ptable.h"
 
+/* PerlMemShared_free() needs the [ap]PTBLMS_? default values */
+#define ptable_seen_store(T, K, V) ptable_seen_store(aPTBLMS_ (T), (K), (V))
+#define ptable_seen_clear(T)       ptable_seen_clear(aPTBLMS_ (T))
+#define ptable_seen_free(T)        ptable_seen_free(aPTBLMS_ (T))
+
 #endif /* !A_HAS_RPEEP */
 
 #define A_NEED_CXT ((A_THREADSAFE && A_WORKAROUND_REQUIRE_PROPAGATION) || !A_HAS_RPEEP)
@@ -352,6 +357,7 @@ typedef struct {
 
 /* PerlMemShared_free() needs the [ap]PTBLMS_? default values */
 #define ptable_map_store(T, K, V) ptable_map_store(aPTBLMS_ (T), (K), (V))
+#define ptable_map_delete(T, K)   ptable_map_delete(aPTBLMS_ (T), (K))
 
 STATIC ptable *a_op_map = NULL;
 
