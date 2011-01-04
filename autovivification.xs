@@ -107,8 +107,6 @@ typedef struct {
 
 #endif /* A_WORKAROUND_REQUIRE_PROPAGATION */
 
-#if !A_HAS_RPEEP
-
 #define PTABLE_NAME        ptable_seen
 #define PTABLE_VAL_FREE(V) NOOP
 
@@ -119,12 +117,6 @@ typedef struct {
 #define ptable_seen_clear(T)       ptable_seen_clear(aPTBLMS_ (T))
 #define ptable_seen_free(T)        ptable_seen_free(aPTBLMS_ (T))
 
-#endif /* !A_HAS_RPEEP */
-
-#define A_NEED_CXT ((A_THREADSAFE && A_WORKAROUND_REQUIRE_PROPAGATION) || !A_HAS_RPEEP)
-
-#if A_NEED_CXT
-
 #define MY_CXT_KEY __PACKAGE__ "::_guts" XS_VERSION
 
 typedef struct {
@@ -132,9 +124,7 @@ typedef struct {
  ptable *tbl;   /* It really is a ptable_hints */
  tTHX    owner;
 #endif /* A_THREADSAFE && A_WORKAROUND_REQUIRE_PROPAGATION */
-#if !A_HAS_RPEEP
  ptable *seen;  /* It really is a ptable_seen */
-#endif /* !A_HAS_RPEEP */
 } my_cxt_t;
 
 START_MY_CXT
@@ -190,14 +180,10 @@ STATIC void a_thread_cleanup(pTHX_ void *ud) {
 #if A_WORKAROUND_REQUIRE_PROPAGATION
  ptable_hints_free(MY_CXT.tbl);
 #endif /* A_WORKAROUND_REQUIRE_PROPAGATION */
-#if !A_HAS_RPEEP
  ptable_seen_free(MY_CXT.seen);
-#endif /* !A_HAS_RPEEP */
 }
 
 #endif /* A_THREADSAFE */
-
-#endif /* A_NEED_CXT */
 
 #if A_WORKAROUND_REQUIRE_PROPAGATION
 
@@ -947,33 +933,19 @@ STATIC OP *a_ck_root(pTHX_ OP *o) {
 
 STATIC peep_t a_old_peep = 0; /* This is actually the rpeep past 5.13.5 */
 
-#if !A_HAS_RPEEP
-# define A_PEEP_REC_PROTO STATIC void a_peep_rec(pTHX_ OP *o, ptable *seen)
-#else /* !A_HAS_RPEEP */
-# define A_PEEP_REC_PROTO STATIC void a_peep_rec(pTHX_ OP *o)
-#endif /* A_HAS_RPEEP */
+STATIC void a_peep_rec(pTHX_ OP *o, ptable *seen);
 
-A_PEEP_REC_PROTO;
-A_PEEP_REC_PROTO {
-#if !A_HAS_RPEEP
-# define a_peep_rec(O) a_peep_rec(aTHX_ (O), seen)
-#else /* !A_HAS_RPEEP */
-# define a_peep_rec(O) a_peep_rec(aTHX_ (O))
-#endif /* A_HAS_RPEEP */
- dA_MAP_THX;
-
-#if !A_HAS_RPEEP
- if (ptable_fetch(seen, o))
-  return;
-#endif
-
+STATIC void a_peep_rec(pTHX_ OP *o, ptable *seen) {
+#define a_peep_rec(O) a_peep_rec(aTHX_ (O), seen)
  for (; o; o = o->op_next) {
+  dA_MAP_THX;
   const a_op_info *oi = NULL;
   UV flags = 0;
 
-#if !A_HAS_RPEEP
+  if (ptable_fetch(seen, o))
+   break;
   ptable_seen_store(seen, o, o);
-#endif
+
   switch (o->op_type) {
    case OP_PADSV:
     if (o->op_ppaddr != a_pp_deref) {
@@ -1058,15 +1030,14 @@ A_PEEP_REC_PROTO {
 }
 
 STATIC void a_peep(pTHX_ OP *o) {
-#if !A_HAS_RPEEP
  dMY_CXT;
  ptable *seen = MY_CXT.seen;
 
- ptable_seen_clear(seen);
-#endif /* !A_HAS_RPEEP */
-
  a_old_peep(aTHX_ o);
+
+ ptable_seen_clear(seen);
  a_peep_rec(o);
+ ptable_seen_clear(seen);
 }
 
 /* --- Interpreter setup/teardown ------------------------------------------ */
@@ -1083,17 +1054,13 @@ STATIC void a_teardown(pTHX_ void *root) {
   return;
 #endif
 
-#if A_NEED_CXT
  {
   dMY_CXT;
 # if A_THREADSAFE && A_WORKAROUND_REQUIRE_PROPAGATION
   ptable_hints_free(MY_CXT.tbl);
 # endif /* A_THREADSAFE && A_WORKAROUND_REQUIRE_PROPAGATION */
-# if !A_HAS_RPEEP
   ptable_seen_free(MY_CXT.seen);
-# endif /* !A_HAS_RPEEP */
  }
-#endif /* A_NEED_CXT */
 
  PL_check[OP_PADANY] = MEMBER_TO_FPTR(a_old_ck_padany);
  a_old_ck_padany     = 0;
@@ -1141,18 +1108,14 @@ STATIC void a_setup(pTHX) {
  if (a_initialized)
   return;
 
-#if A_NEED_CXT
  {
   MY_CXT_INIT;
 # if A_THREADSAFE && A_WORKAROUND_REQUIRE_PROPAGATION
   MY_CXT.tbl   = ptable_new();
   MY_CXT.owner = aTHX;
 # endif /* A_THREADSAFE && A_WORKAROUND_REQUIRE_PROPAGATION */
-# if !A_HAS_RPEEP
   MY_CXT.seen  = ptable_new();
-# endif /* !A_RPEEP */
  }
-#endif /* A_NEED_CXT */
 
  a_old_ck_padany     = PL_check[OP_PADANY];
  PL_check[OP_PADANY] = MEMBER_TO_FPTR(a_ck_padany);
@@ -1237,7 +1200,7 @@ BOOT:
  a_setup();
 }
 
-#if A_THREADSAFE && (A_WORKAROUND_REQUIRE_PROPAGATION || !A_HAS_RPEEP)
+#if A_THREADSAFE
 
 void
 CLONE(...)
@@ -1246,9 +1209,7 @@ PREINIT:
 #if A_WORKAROUND_REQUIRE_PROPAGATION
  ptable *t;
 #endif
-#if !A_HAS_RPEEP
  ptable *s;
-#endif
 PPCODE:
  {
   dMY_CXT;
@@ -1262,9 +1223,7 @@ PPCODE:
    a_ptable_clone_ud_deinit(ud);
   }
 #endif
-#if !A_HAS_RPEEP
   s = ptable_new();
-#endif
  }
  {
   MY_CXT_CLONE;
@@ -1272,14 +1231,12 @@ PPCODE:
   MY_CXT.tbl   = t;
   MY_CXT.owner = aTHX;
 #endif
-#if !A_HAS_RPEEP
   MY_CXT.seen  = s;
-#endif
  }
  reap(3, a_thread_cleanup, NULL);
  XSRETURN(0);
 
-#endif
+#endif /* A_THREADSAFE */
 
 SV *
 _tag(SV *hint)
