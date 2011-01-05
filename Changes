@@ -1,5 +1,12 @@
 Revision history for autovivification
 
+0.09    2011-01-05 18:40 UTC
+        + Fix : [RT #64435] : Hangs with File::Copy in Config.pm.
+                This was actually a regression introduced together with the new
+                peephole optimizer strategy, and that caused the pragma to hang
+                on constructs like "for (;;) { ... }".
+                Thanks Michael Schilli for reporting.
+
 0.08    2011-01-03 21:00 UTC
         + Fix : Building on Windows.
 

@@ -11,13 +11,13 @@ autovivification - Lexically disable autovivification.
 
 =head1 VERSION
 
-Version 0.08
+Version 0.09
 
 =cut
 
 our $VERSION;
 BEGIN {
- $VERSION = '0.08';
+ $VERSION = '0.09';
 }
 
 =head1 SYNOPSIS
