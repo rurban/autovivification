@@ -16,7 +16,7 @@ BEGIN {
  skipall 'This perl wasn\'t built to support threads'
                                                     unless $Config{useithreads};
  skipall 'perl 5.13.4 required to test thread safety'
-                                                unless $force or $] >= 5.013004;
+                                              unless $force or "$]" >= 5.013004;
 }
 
 use threads;
@@ -66,7 +66,7 @@ BEGIN {
 SKIP:
    {
     skip 'Hints aren\'t propagated into eval STRING below perl 5.10' => 3 * 2
-                                                             unless $] >= 5.010;
+                                                           unless "$]" >= 5.010;
     {
      my $x;
      eval 'my $y = $x->{foo}';

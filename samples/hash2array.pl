@@ -102,7 +102,7 @@ while (<$hash_kv_t>) {
   if (/\bplan\s*[\s\(]\s*tests\b/) {
    s/\s*;?\s*$//;
    s/^(\s*)//;
-   $_ = "$1if (\$] >= 5.011) { $_ } else { plan skip_all => 'perl 5.11 required for keys/values \@array' }\n";
+   $_ = qq($1if ("\$]" >= 5.011) { $_ } else { plan skip_all => 'perl 5.11 required for keys/values \@array' }\n);
   }
  } else {
   $_ = convert_testcase($_, 1);

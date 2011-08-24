@@ -7,7 +7,7 @@ use lib 't/lib';
 use Test::Leaner;
 
 BEGIN {
- if ($] >= 5.011) { plan tests => 9 * 3 * 64 } else { plan skip_all => 'perl 5.11 required for keys/values @array' }
+ if ("$]" >= 5.011) { plan tests => 9 * 3 * 64 } else { plan skip_all => 'perl 5.11 required for keys/values @array' }
 }
 
 use autovivification::TestCases;
