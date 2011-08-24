@@ -1,5 +1,9 @@
 Revision history for autovivification
 
+0.10    2011-08-24 15:00 UTC
+        + Fix : The pragma no longer vivifies the "autovivification" entry
+                in the hints hash %^H on perl 5.8.
+
 0.09    2011-01-05 18:40 UTC
         + Fix : [RT #64435] : Hangs with File::Copy in Config.pm.
                 This was actually a regression introduced together with the new
