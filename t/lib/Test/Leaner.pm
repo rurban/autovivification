@@ -10,11 +10,11 @@ Test::Leaner - A slimmer Test::More for when you favor performance over complete
 
 =head1 VERSION
 
-Version 0.02
+Version 0.04
 
 =cut
 
-our $VERSION = '0.02';
+our $VERSION = '0.04';
 
 =head1 SYNOPSIS
 
@@ -37,16 +37,20 @@ Its functions behave the same as their L<Test::More> counterparts, except for th
 =item *
 
 Stringification isn't forced on the test operands.
-However, L</ok> honors C<'bool'> overloading, L</is> and L</is_deeply> honor C<'eq'> overloading (and just that one) and L</cmp_ok> honors whichever overloading category corresponds to the specified operator.
+However, L</ok> honors C<'bool'> overloading, L</is> and L</is_deeply> honor C<'eq'> overloading (and just that one), L</isnt> honors C<'ne'> overloading, and L</cmp_ok> honors whichever overloading category corresponds to the specified operator.
 
 =item *
 
-L</pass>, L</fail>, L</ok>, L</is>, L</isnt>, L</like>, L</unlike> and L</cmp_ok> are all guaranteed to return the truth value of the test.
+L</pass>, L</fail>, L</ok>, L</is>, L</isnt>, L</like>, L</unlike>, L</cmp_ok> and L</is_deeply> are all guaranteed to return the truth value of the test.
+
+=item *
+
+C<isn't> (the sub C<t> in package C<isn>) is not aliased to L</isnt>.
 
 =item *
 
 L</like> and L</unlike> don't special case regular expressions that are passed as C<'/.../'> strings.
-A string regexp argument is always treated as a the source of the regexp, making C<like $text, $rx> and C<like $text, qr[$rx]> equivalent to each other and to C<cmp_ok $text, '=~', $rx> (and likewise for C<unlike>).
+A string regexp argument is always treated as the source of the regexp, making C<like $text, $rx> and C<like $text, qr[$rx]> equivalent to each other and to C<cmp_ok $text, '=~', $rx> (and likewise for C<unlike>).
 
 =item *
 
@@ -61,6 +65,7 @@ If the two first arguments present parallel memory cycles, the test may result i
 =item *
 
 The tests don't output any kind of default diagnostic in case of failure ; the rationale being that if you have a large number of tests and a lot of them are failing, then you don't want to be flooded by diagnostics.
+Moreover, this allows a much faster variant of L</is_deeply>.
 
 =item *
 
@@ -77,7 +82,7 @@ my $main_process;
 BEGIN {
  $main_process = $$;
 
- if ($] >= 5.008 and $INC{'threads.pm'}) {
+ if ("$]" >= 5.008 and $INC{'threads.pm'}) {
   my $use_ithreads = do {
    require Config;
    no warnings 'once';
@@ -120,7 +125,7 @@ our @EXPORT = qw<
 =head2 C<PERL_TEST_LEANER_USES_TEST_MORE>
 
 If this environment variable is set, L<Test::Leaner> will replace its functions by those from L<Test::More>.
-Moreover, the symbols that are imported you C<use Test::Leaner> will be those from L<Test::More>, but you can still only import the symbols originally defined in L<Test::Leaner> (hence the functions from L<Test::More> that are not implemented in L<Test::Leaner> will not be imported).
+Moreover, the symbols that are imported when you C<use Test::Leaner> will be those from L<Test::More>, but you can still only import the symbols originally defined in L<Test::Leaner> (hence the functions from L<Test::More> that are not implemented in L<Test::Leaner> will not be imported).
 If your version of L<Test::More> is too old and doesn't have some symbols (like L</note> or L</done_testing>), they will be replaced in L<Test::Leaner> by croaking stubs.
 
 This may be useful if your L<Test::Leaner>-based test script fails and you want extra diagnostics.
@@ -160,14 +165,13 @@ if ($ENV{PERL_TEST_LEANER_USES_TEST_MORE}) {
  my $leaner_stash = \%Test::Leaner::;
  my $more_stash   = \%Test::More::;
 
- my %valid_imports;
+ my %stubbed;
 
  for (@EXPORT) {
   my $replacement = exists $more_stash->{$_} ? *{$more_stash->{$_}}{CODE}
                                              : undef;
-  if (defined $replacement) {
-   $valid_imports{$_} = 1;
-  } else {
+  unless (defined $replacement) {
+   $stubbed{$_}++;
    $replacement = sub {
     @_ = ("$_ is not implemented in this version of Test::More");
     goto &croak;
@@ -178,20 +182,33 @@ if ($ENV{PERL_TEST_LEANER_USES_TEST_MORE}) {
  }
 
  my $import = sub {
-  shift;
+  my $class = shift;
+
   my @imports = &_handle_import_args;
-  @imports = @EXPORT unless @imports;
+  if (@imports == grep /^!/, @imports) {
+   # All imports are negated, or @imports is empty
+   my %negated;
+   /^!(.*)/ and ++$negated{$1} for @imports;
+   push @imports, grep !$negated{$_}, @EXPORT;
+  }
+
   my @test_more_imports;
   for (@imports) {
-   if ($valid_imports{$_}) {
-    push @test_more_imports, $_;
-   } else {
+   if ($stubbed{$_}) {
     my $pkg = caller;
     no strict 'refs';
     *{$pkg."::$_"} = $leaner_stash->{$_};
+   } elsif (/^!/ or !exists $more_stash->{$_} or exists $leaner_stash->{$_}) {
+    push @test_more_imports, $_;
+   } else {
+    # Croak for symbols in Test::More but not in Test::Leaner
+    Exporter::import($class, $_);
    }
   }
+
   my $test_more_import = 'Test::More'->can('import');
+  return unless $test_more_import;
+
   @_ = (
    'Test::More',
    @_,
@@ -201,6 +218,7 @@ if ($ENV{PERL_TEST_LEANER_USES_TEST_MORE}) {
    lock $plan if THREADSAFE;
    push @_, 'no_diag' if $no_diag;
   }
+
   goto $test_more_import;
  };
 
@@ -402,10 +420,10 @@ sub ok ($;$) {
  ++$test;
 
  my $test_str = "ok $test";
- unless ($ok) {
+ $ok or do {
   $test_str   = "not $test_str";
   ++$failed;
- }
+ };
  if (defined $desc) {
   _sanitize_comment($desc);
   $test_str .= " - $desc" if length $desc;
@@ -477,7 +495,7 @@ my %binops = (
  'and' => 'and',
 
  '||'  => 'hor',
- ('//' => 'dor') x ($] >= 5.010),
+ ('//' => 'dor') x ("$]" >= 5.010),
  '&&'  => 'hand',
 
  '|'   => 'bor',
@@ -502,7 +520,7 @@ my %binops = (
 
  '=~'  => 'like',
  '!~'  => 'unlike',
- ('~~' => 'smartmatch') x ($] >= 5.010),
+ ('~~' => 'smartmatch') x ("$]" >= 5.010),
 
  '+'   => 'add',
  '-'   => 'substract',
@@ -864,7 +882,13 @@ You can find documentation for this module with the perldoc command.
 
 =head1 COPYRIGHT & LICENSE
 
-Copyright 2010 Vincent Pit, all rights reserved.
+Copyright 2010,2011 Vincent Pit, all rights reserved.
+
+This program is free software; you can redistribute it and/or modify it under the same terms as Perl itself.
+
+Except for the fallback implementation of the internal C<_reftype> function, which has been taken from L<Scalar::Util> and is
+
+Copyright 1997-2007 Graham Barr, all rights reserved.
 
 This program is free software; you can redistribute it and/or modify it under the same terms as Perl itself.
 
