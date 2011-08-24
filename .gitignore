@@ -6,6 +6,7 @@ Makefile.old
 Build
 _build*
 
+MYMETA.json
 MYMETA.yml
 
 *.tar.gz
