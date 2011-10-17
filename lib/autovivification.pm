@@ -113,7 +113,7 @@ Turns off autovivification for lvalue dereferencing expressions, such as :
     function($arrayref->[$idx])
     function($hashref->{$key})
 
-An exception is thrown if vivification is needed to store the value, which means that effectively you can only assign to levels that are already defined
+An exception is thrown if vivification is needed to store the value, which means that effectively you can only assign to levels that are already defined.
 In the example, this would require C<$arrayref> (resp. C<$hashref>) to already be an array (resp. hash) reference.
 
 =item *
@@ -188,7 +188,7 @@ This constant only has a meaning with your perl is threaded ; otherwise, it'll a
 =head2 C<A_FORKSAFE>
 
 True iff this module could have been built with fork-safety features enabled.
-This will always be true except on Windows where it's false for perl 5.10.0 and below .
+This will always be true except on Windows where it's false for perl 5.10.0 and below.
 
 =head1 CAVEATS
 
