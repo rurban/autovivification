@@ -3,33 +3,10 @@
 use strict;
 use warnings;
 
-sub skipall {
- my ($msg) = @_;
- require Test::More;
- Test::More::plan(skip_all => $msg);
-}
+use lib 't/lib';
+use autovivification::TestThreads;
 
-use Config qw<%Config>;
-
-BEGIN {
- my $force = $ENV{PERL_AUTOVIVIFICATION_TEST_THREADS} ? 1 : !1;
- skipall 'This perl wasn\'t built to support threads'
-                                                    unless $Config{useithreads};
- skipall 'perl 5.13.4 required to test thread safety'
-                                              unless $force or "$]" >= 5.013004;
-}
-
-use threads;
-
-use Test::More;
-
-BEGIN {
- require autovivification;
- skipall 'This autovivification isn\'t thread safe'
-                                        unless autovivification::A_THREADSAFE();
- plan tests => 1;
- defined and diag "Using threads $_" for $threads::VERSION;
-}
+use Test::Leaner tests => 1;
 
 sub run_perl {
  my $code = shift;

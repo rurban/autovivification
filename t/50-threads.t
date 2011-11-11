@@ -3,42 +3,13 @@
 use strict;
 use warnings;
 
-sub skipall {
- my ($msg) = @_;
- require Test::More;
- Test::More::plan(skip_all => $msg);
-}
+use lib 't/lib';
+use autovivification::TestThreads;
 
-use Config qw<%Config>;
+use Test::Leaner;
 
-BEGIN {
- my $force = $ENV{PERL_AUTOVIVIFICATION_TEST_THREADS} ? 1 : !1;
- skipall 'This perl wasn\'t built to support threads'
-                                                    unless $Config{useithreads};
- skipall 'perl 5.13.4 required to test thread safety'
-                                              unless $force or "$]" >= 5.013004;
-}
-
-use threads;
-
-use Test::More;
-
-BEGIN {
- require autovivification;
- skipall 'This autovivification isn\'t thread safe'
-                                        unless autovivification::A_THREADSAFE();
-}
-
-my ($threads, $runs);
-BEGIN {
- $threads = 10;
- $runs    = 2;
-}
-
-BEGIN {
- plan tests => $threads * $runs * 3 * (1 + 2);
- defined and diag "Using threads $_" for $threads::VERSION;
-}
+my $threads = 10;
+my $runs    = 2;
 
 {
  no autovivification;
@@ -90,5 +61,10 @@ SKIP:
  }
 }
 
-my @t = map threads->create(\&try), 1 .. $threads;
-$_->join for @t;
+my @threads = map spawn(\&try), 1 .. $threads;
+
+$_->join for @threads;
+
+pass 'done';
+
+done_testing(scalar(@threads) * $runs * 3 * (1 + 2) + 1);
