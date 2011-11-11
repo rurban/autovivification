@@ -134,11 +134,11 @@ START_MY_CXT
 #if A_WORKAROUND_REQUIRE_PROPAGATION
 
 typedef struct {
- ptable *tbl;
+ ptable       *tbl;
 #if A_HAS_PERL(5, 13, 2)
  CLONE_PARAMS *params;
 #else
- CLONE_PARAMS params;
+ CLONE_PARAMS  params;
 #endif
 } a_ptable_clone_ud;
 
@@ -331,9 +331,9 @@ STATIC UV a_hint(pTHX) {
 /* ... op => info map ...................................................... */
 
 typedef struct {
- OP *(*old_pp)(pTHX);
- UV flags;
- void *next;
+ OP   *(*old_pp)(pTHX);
+ void   *next;
+ UV      flags;
 } a_op_info;
 
 #define PTABLE_NAME        ptable_map
