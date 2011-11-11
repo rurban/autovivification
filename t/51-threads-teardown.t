@@ -11,9 +11,10 @@ use Test::Leaner tests => 1;
 sub run_perl {
  my $code = shift;
 
- my $SystemRoot   = $ENV{SystemRoot};
+ my ($SystemRoot, $PATH) = @ENV{qw<SystemRoot PATH>};
  local %ENV;
  $ENV{SystemRoot} = $SystemRoot if $^O eq 'MSWin32' and defined $SystemRoot;
+ $ENV{PATH}       = $PATH       if $^O eq 'cygwin'  and defined $PATH;
 
  system { $^X } $^X, '-T', map("-I$_", @INC), '-e', $code;
 }
