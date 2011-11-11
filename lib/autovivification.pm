@@ -53,7 +53,12 @@ BEGIN {
 
 =head1 METHODS
 
-=head2 C<unimport @opts>
+=head2 C<unimport>
+
+    no autovivification; # defaults to qw<fetch exists delete>
+    no autovivification qw<fetch store exists delete>;
+    no autovivification 'warn';
+    no autovivification 'strict';
 
 Magically called when C<no autovivification @opts> is encountered.
 Enables the features given in C<@opts>, which can be :
@@ -155,7 +160,10 @@ sub unimport {
  ();
 }
 
-=head2 C<import @opts>
+=head2 C<import>
+
+    use autovivification; # default Perl behaviour
+    use autovivification qw<fetch store exists delete>;
 
 Magically called when C<use autovivification @opts> is encountered.
 Disables the features given in C<@opts>, which can be the same as for L</unimport>.
