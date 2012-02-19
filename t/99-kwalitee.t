@@ -5,8 +5,14 @@ use warnings;
 
 use Test::More;
 
-eval { require Test::Kwalitee; };
-plan(skip_all => 'Test::Kwalitee not installed') if $@;
+eval { require Parse::RecDescent; 'Parse::RecDescent'->VERSION('1.967006') }
+  or plan skip_all => 'Parse::RecDescent version 1.967006 or greater required';
+
+eval { require Module::ExtractUse; 'Module::ExtractUse'->VERSION('0.24') }
+  or plan skip_all => 'Module::ExtractUse version 0.24 or greater required';
+
+eval { require Test::Kwalitee; 1 }
+  or plan skip_all => 'Test::Kwalitee required';
 
 SKIP: {
  eval { Test::Kwalitee->import(); };
