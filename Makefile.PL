@@ -4,12 +4,7 @@ use strict;
 use warnings;
 use ExtUtils::MakeMaker;
 
-BEGIN {
- local $@;
- eval { require Config };
- die 'OS unsupported' if $@;
- Config->import(qw<%Config>);
-}
+use Config;
 
 my @DEFINES;
 my %macro;
@@ -57,14 +52,20 @@ my %PREREQ_PM = (
  'XSLoader' => 0,
 );
 
+my %BUILD_REQUIRES = (
+ 'Config'              => 0,
+ 'Exporter'            => 0,
+ 'ExtUtils::MakeMaker' => 0,
+ 'Test::More'          => 0,
+ %PREREQ_PM,
+);
+
 my %META = (
  configure_requires => {
   'ExtUtils::MakeMaker' => 0,
  },
  build_requires => {
-  'ExtUtils::MakeMaker' => 0,
-  'Test::More'          => 0,
-  %PREREQ_PM,
+  %BUILD_REQUIRES,
  },
  dynamic_config => 1,
  resources => {
@@ -83,6 +84,7 @@ WriteMakefile(
  ABSTRACT_FROM    => $file,
  PL_FILES         => {},
  @DEFINES,
+ BUILD_REQUIRES   => \%BUILD_REQUIRES,
  PREREQ_PM        => \%PREREQ_PM,
  MIN_PERL_VERSION => '5.008003',
  META_MERGE       => \%META,
