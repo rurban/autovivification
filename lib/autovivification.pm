@@ -39,7 +39,7 @@ BEGIN {
 =head1 DESCRIPTION
 
 When an undefined variable is dereferenced, it gets silently upgraded to an array or hash reference (depending of the type of the dereferencing).
-This behaviour is called I<autovivification> and usually does what you mean (e.g. when you store a value) but it's sometimes unnatural or surprising because your variables gets populated behind your back.
+This behaviour is called I<autovivification> and usually does what you mean (e.g. when you store a value) but it may be unnatural or surprising because your variables gets populated behind your back.
 This is especially true when several levels of dereferencing are involved, in which case all levels are vivified up to the last, or when it happens in intuitively read-only constructs like C<exists>.
 
 This pragma lets you disable autovivification for some constructs and optionally throws a warning or an error when it would have happened.
@@ -135,7 +135,7 @@ Throws an exception when an autovivification is avoided.
 
 =back
 
-Each call to C<unimport> adds the specified features to the ones already in use in the current lexical scope.
+Each call to C<unimport> B<adds> the specified features to the ones already in use in the current lexical scope.
 
 When C<@opts> is empty, it defaults to C<< qw<fetch exists delete> >>.
 
@@ -168,7 +168,7 @@ sub unimport {
 Magically called when C<use autovivification @opts> is encountered.
 Disables the features given in C<@opts>, which can be the same as for L</unimport>.
 
-Each call to C<import> removes the specified features to the ones already in use in the current lexical scope.
+Each call to C<import> B<removes> the specified features to the ones already in use in the current lexical scope.
 
 When C<@opts> is empty, it defaults to restoring the original Perl autovivification behaviour.
 
@@ -190,18 +190,18 @@ sub import {
 
 =head2 C<A_THREADSAFE>
 
-True iff the module could have been built with thread-safety features enabled.
-This constant only has a meaning with your perl is threaded ; otherwise, it'll always be false.
+True if and only if the module could have been built with thread-safety features enabled.
+This constant only has a meaning when your perl is threaded, otherwise it will always be false.
 
 =head2 C<A_FORKSAFE>
 
-True iff this module could have been built with fork-safety features enabled.
-This will always be true except on Windows where it's false for perl 5.10.0 and below.
+True if and only if this module could have been built with fork-safety features enabled.
+This constant will always be true, except on Windows where it is false for perl 5.10.0 and below.
 
 =head1 CAVEATS
 
 The pragma doesn't apply when one dereferences the returned value of an array or hash slice, as in C<< @array[$id]->{member} >> or C<< @hash{$key}->{member} >>.
-This syntax is valid Perl, yet it's discouraged as the slice is here useless since the dereferencing enforces scalar context.
+This syntax is valid Perl, yet it is discouraged as the slice is here useless since the dereferencing enforces scalar context.
 If warnings are turned on, Perl will complain about one-element slices.
 
 =head1 DEPENDENCIES
