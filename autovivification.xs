@@ -586,7 +586,7 @@ STATIC OP *a_pp_rv2av(pTHX) {
    /* We always need to push an empty array to fool the pp_aelem() that comes
     * later. */
    SV *av;
-   POPs;
+   (void) POPs;
    av = sv_2mortal((SV *) newAV());
    PUSHs(av);
    RETURN;
@@ -623,7 +623,7 @@ STATIC OP *a_pp_rv2hv(pTHX) {
  if (oi->flags & A_HINT_DEREF) {
   if (a_undef(TOPs)) {
    SV *hv;
-   POPs;
+   (void) POPs;
    hv = sv_2mortal((SV *) newHV());
    PUSHs(hv);
    RETURN;
@@ -673,7 +673,7 @@ STATIC OP *a_pp_root_unop(pTHX) {
  dSP;
 
  if (a_undef(TOPs)) {
-  POPs;
+  (void) POPs;
   /* Can only be reached by keys or values */
   if (GIMME_V == G_SCALAR) {
    dTARGET;
@@ -693,8 +693,8 @@ STATIC OP *a_pp_root_binop(pTHX) {
  dSP;
 
  if (a_undef(TOPm1s)) {
-  POPs;
-  POPs;
+  (void) POPs;
+  (void) POPs;
   if (PL_op->op_type == OP_EXISTS)
    RETPUSHNO;
   else
