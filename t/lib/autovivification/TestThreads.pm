@@ -5,39 +5,24 @@ use warnings;
 
 use Config qw<%Config>;
 
-sub skipall {
- my ($msg) = @_;
- require Test::Leaner;
- Test::Leaner::plan(skip_all => $msg);
-}
-
-sub diag {
- require Test::Leaner;
- Test::Leaner::diag(@_);
-}
+use VPIT::TestHelpers;
 
 sub import {
  shift;
 
  require autovivification;
 
- skipall 'This autovivification isn\'t thread safe'
+ skip_all 'This autovivification isn\'t thread safe'
                                         unless autovivification::A_THREADSAFE();
 
  my $force = $ENV{PERL_AUTOVIVIFICATION_TEST_THREADS} ? 1 : !1;
- skipall 'This perl wasn\'t built to support threads'
+ skip_all 'This perl wasn\'t built to support threads'
                                                     unless $Config{useithreads};
- skipall 'perl 5.13.4 required to test thread safety'
+ skip_all 'perl 5.13.4 required to test thread safety'
                                               unless $force or "$]" >= 5.013004;
 
- my $t_v = $force ? '0' : '1.67';
- my $has_threads =  do {
-  local $@;
-  eval "use threads $t_v; 1";
- };
- skipall "threads $t_v required to test thread safety" unless $has_threads;
-
- defined and diag "Using threads $_" for $threads::VERSION;
+ load_or_skip('threads', $force ? '0' : '1.67', [ ],
+              'required to test thread safety');
 
  my %exports = (
   spawn => \&spawn,
