@@ -25,4 +25,4 @@ cover_db
 *.gcov
 *.gcno
 
-Debian_CPANTS.txt
+Debian_CPANTS.txt*

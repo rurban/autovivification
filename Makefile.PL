@@ -91,7 +91,7 @@ WriteMakefile(
   COMPRESS => 'gzip -9f', SUFFIX => 'gz'
  },
  clean            => {
-  FILES => "$dist-* *.gcov *.gcda *.gcno cover_db Debian_CPANTS.txt"
+  FILES => "$dist-* *.gcov *.gcda *.gcno cover_db Debian_CPANTS.txt*"
  },
  %macro,
 );
