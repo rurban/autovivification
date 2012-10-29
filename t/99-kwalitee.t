@@ -5,14 +5,18 @@ use warnings;
 
 use Test::More;
 
-eval { require Parse::RecDescent; 'Parse::RecDescent'->VERSION('1.967006') }
-  or plan skip_all => 'Parse::RecDescent version 1.967006 or greater required';
+use lib 't/lib';
+use VPIT::TestHelpers;
 
-eval { require Module::ExtractUse; 'Module::ExtractUse'->VERSION('0.24') }
-  or plan skip_all => 'Module::ExtractUse version 0.24 or greater required';
+my $guard = VPIT::TestHelpers::Guard->new(
+ sub { unlink for glob 'Debian_CPANTS.txt*' }
+);
 
-eval { require Test::Kwalitee; 1 }
-  or plan skip_all => 'Test::Kwalitee required';
+my $desc = 'required to test kwalitee';
+
+load_or_skip('Parse::RecDescent',  '1.967006', undef, $desc);
+load_or_skip('Module::ExtractUse', '0.24',     undef, $desc);
+load_or_skip('Test::Kwalitee',     '1.01',     undef, $desc);
 
 SKIP: {
  eval { Test::Kwalitee->import(); };

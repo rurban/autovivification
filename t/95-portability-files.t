@@ -5,6 +5,10 @@ use warnings;
 
 use Test::More;
 
-eval "use Test::Portability::Files";
-plan skip_all => "Test::Portability::Files required for testing filenames portability" if $@;
+use lib 't/lib';
+use VPIT::TestHelpers;
+
+load_or_skip('Test::Portability::Files', undef, [ ],
+             'required for testing filenames portability');
+
 run_tests();
