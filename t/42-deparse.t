@@ -8,8 +8,7 @@ use Test::More;
 use lib 't/lib';
 use VPIT::TestHelpers;
 
-load_or_skip('B::Deparse', undef, [ ],
-             'required to test round-trip deparsing compatibility');
+load_or_skip_all('B::Deparse', undef, [ ]);
 
 plan tests => 2;
 

@@ -8,10 +8,8 @@ use Test::More;
 use lib 't/lib';
 use VPIT::TestHelpers;
 
-my $desc = 'required for testing POD coverage';
-
-load_or_skip('Test::Pod::Coverage', '1.08', [ ],   $desc);
-load_or_skip('Pod::Coverage',       '0.18', undef, $desc);
+load_or_skip_all('Test::Pod::Coverage', '1.08', [ ]);
+load_or_skip_all('Pod::Coverage',       '0.18'     );
 
 eval 'use Test::Pod::Coverage'; # Make Kwalitee test happy
 

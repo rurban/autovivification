@@ -21,8 +21,7 @@ sub import {
  skip_all 'perl 5.13.4 required to test thread safety'
                                               unless $force or "$]" >= 5.013004;
 
- load_or_skip('threads', $force ? '0' : '1.67', [ ],
-              'required to test thread safety');
+ load_or_skip_all('threads', $force ? '0' : '1.67', [ ]);
 
  my %exports = (
   spawn => \&spawn,
