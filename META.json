@@ -4,7 +4,7 @@
       "Vincent Pit <perl@profvince.com>"
    ],
    "dynamic_config" : 1,
-   "generated_by" : "ExtUtils::MakeMaker version 6.59, CPAN::Meta::Converter version 2.112150",
+   "generated_by" : "ExtUtils::MakeMaker version 6.64, CPAN::Meta::Converter version 2.120921",
    "license" : [
       "perl_5"
    ],
@@ -22,19 +22,21 @@
    "prereqs" : {
       "build" : {
          "requires" : {
-            "ExtUtils::MakeMaker" : 0,
-            "Test::More" : 0,
-            "XSLoader" : 0
+            "Config" : "0",
+            "Exporter" : "0",
+            "ExtUtils::MakeMaker" : "0",
+            "Test::More" : "0",
+            "XSLoader" : "0"
          }
       },
       "configure" : {
          "requires" : {
-            "ExtUtils::MakeMaker" : 0
+            "ExtUtils::MakeMaker" : "0"
          }
       },
       "runtime" : {
          "requires" : {
-            "XSLoader" : 0,
+            "XSLoader" : "0",
             "perl" : "5.008003"
          }
       }
@@ -52,5 +54,5 @@
          "url" : "http://git.profvince.com/?p=perl%2Fmodules%2Fautovivification.git"
       }
    },
-   "version" : "0.10"
+   "version" : "0.11"
 }

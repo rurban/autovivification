@@ -1,5 +1,13 @@
 Revision history for autovivification
 
+0.11    2013-02-08 19:25 UTC
+        This is a maintenance release. The code contains no functional change.
+        Satisfied users of version 0.10 can skip this update.
+        + Doc : POD tweaks and clarifications.
+        + Tst : Threads tests will not fail anymore if resources constraints
+                prevent the system from creating all the required threads.
+        + Tst : Author tests overhaul.
+
 0.10    2011-08-24 15:00 UTC
         + Fix : The pragma no longer vivifies the "autovivification" entry
                 in the hints hash %^H on perl 5.8.
