@@ -30,7 +30,6 @@ t/91-pod.t
 t/92-pod-coverage.t
 t/93-pod-spelling.t
 t/95-portability-files.t
-t/99-kwalitee.t
 t/lib/Test/Leaner.pm
 t/lib/VPIT/TestHelpers.pm
 t/lib/autovivification/TestCases.pm
