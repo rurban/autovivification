@@ -26,10 +26,6 @@ t/42-deparse.t
 t/43-peep.t
 t/50-threads.t
 t/51-threads-teardown.t
-t/91-pod.t
-t/92-pod-coverage.t
-t/93-pod-spelling.t
-t/95-portability-files.t
 t/lib/Test/Leaner.pm
 t/lib/VPIT/TestHelpers.pm
 t/lib/autovivification/TestCases.pm
