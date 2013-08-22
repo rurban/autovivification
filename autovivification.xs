@@ -75,6 +75,44 @@
 # define MY_CXT_CLONE NOOP
 #endif
 
+#if defined(OP_CHECK_MUTEX_LOCK) && defined(OP_CHECK_MUTEX_UNLOCK)
+# define A_CHECK_MUTEX_LOCK   OP_CHECK_MUTEX_LOCK
+# define A_CHECK_MUTEX_UNLOCK OP_CHECK_MUTEX_UNLOCK
+#else
+# define A_CHECK_MUTEX_LOCK   OP_REFCNT_LOCK
+# define A_CHECK_MUTEX_UNLOCK OP_REFCNT_UNLOCK
+#endif
+
+typedef OP *(*a_ck_t)(pTHX_ OP *);
+
+#ifdef wrap_op_checker
+
+# define a_ck_replace(T, NC, OCP) wrap_op_checker((T), (NC), (OCP))
+
+#else
+
+STATIC void a_ck_replace(pTHX_ OPCODE type, a_ck_t new_ck, a_ck_t *old_ck_p) {
+#define a_ck_replace(T, NC, OCP) a_ck_replace(aTHX_ (T), (NC), (OCP))
+ A_CHECK_MUTEX_LOCK;
+ if (!*old_ck_p) {
+  *old_ck_p      = PL_check[type];
+  PL_check[type] = new_ck;
+ }
+ A_CHECK_MUTEX_UNLOCK;
+}
+
+#endif
+
+STATIC void a_ck_restore(pTHX_ OPCODE type, a_ck_t *old_ck_p) {
+#define a_ck_restore(T, OCP) a_ck_restore(aTHX_ (T), (OCP))
+ A_CHECK_MUTEX_LOCK;
+ if (*old_ck_p) {
+  PL_check[type] = *old_ck_p;
+  *old_ck_p      = 0;
+ }
+ A_CHECK_MUTEX_UNLOCK;
+}
+
 /* --- Helpers ------------------------------------------------------------- */
 
 /* ... Thread-safe hints ................................................... */
@@ -1062,36 +1100,23 @@ STATIC void a_teardown(pTHX_ void *root) {
   ptable_seen_free(MY_CXT.seen);
  }
 
- PL_check[OP_PADANY] = MEMBER_TO_FPTR(a_old_ck_padany);
- a_old_ck_padany     = 0;
- PL_check[OP_PADSV]  = MEMBER_TO_FPTR(a_old_ck_padsv);
- a_old_ck_padsv      = 0;
+ a_ck_restore(OP_PADANY, &a_old_ck_padany);
+ a_ck_restore(OP_PADSV,  &a_old_ck_padsv);
 
- PL_check[OP_AELEM]  = MEMBER_TO_FPTR(a_old_ck_aelem);
- a_old_ck_aelem      = 0;
- PL_check[OP_HELEM]  = MEMBER_TO_FPTR(a_old_ck_helem);
- a_old_ck_helem      = 0;
- PL_check[OP_RV2SV]  = MEMBER_TO_FPTR(a_old_ck_rv2sv);
- a_old_ck_rv2sv      = 0;
+ a_ck_restore(OP_AELEM,  &a_old_ck_aelem);
+ a_ck_restore(OP_HELEM,  &a_old_ck_helem);
+ a_ck_restore(OP_RV2SV,  &a_old_ck_rv2sv);
 
- PL_check[OP_RV2AV]  = MEMBER_TO_FPTR(a_old_ck_rv2av);
- a_old_ck_rv2av      = 0;
- PL_check[OP_RV2HV]  = MEMBER_TO_FPTR(a_old_ck_rv2hv);
- a_old_ck_rv2hv      = 0;
+ a_ck_restore(OP_RV2AV,  &a_old_ck_rv2av);
+ a_ck_restore(OP_RV2HV,  &a_old_ck_rv2hv);
 
- PL_check[OP_ASLICE] = MEMBER_TO_FPTR(a_old_ck_aslice);
- a_old_ck_aslice     = 0;
- PL_check[OP_HSLICE] = MEMBER_TO_FPTR(a_old_ck_hslice);
- a_old_ck_hslice     = 0;
+ a_ck_restore(OP_ASLICE, &a_old_ck_aslice);
+ a_ck_restore(OP_HSLICE, &a_old_ck_hslice);
 
- PL_check[OP_EXISTS] = MEMBER_TO_FPTR(a_old_ck_exists);
- a_old_ck_exists     = 0;
- PL_check[OP_DELETE] = MEMBER_TO_FPTR(a_old_ck_delete);
- a_old_ck_delete     = 0;
- PL_check[OP_KEYS]   = MEMBER_TO_FPTR(a_old_ck_keys);
- a_old_ck_keys       = 0;
- PL_check[OP_VALUES] = MEMBER_TO_FPTR(a_old_ck_values);
- a_old_ck_values     = 0;
+ a_ck_restore(OP_EXISTS, &a_old_ck_exists);
+ a_ck_restore(OP_DELETE, &a_old_ck_delete);
+ a_ck_restore(OP_KEYS,   &a_old_ck_keys);
+ a_ck_restore(OP_VALUES, &a_old_ck_values);
 
 #if A_HAS_RPEEP
  PL_rpeepp  = a_old_peep;
@@ -1117,36 +1142,23 @@ STATIC void a_setup(pTHX) {
   MY_CXT.seen  = ptable_new();
  }
 
- a_old_ck_padany     = PL_check[OP_PADANY];
- PL_check[OP_PADANY] = MEMBER_TO_FPTR(a_ck_padany);
- a_old_ck_padsv      = PL_check[OP_PADSV];
- PL_check[OP_PADSV]  = MEMBER_TO_FPTR(a_ck_padsv);
+ a_ck_replace(OP_PADANY, a_ck_padany, &a_old_ck_padany);
+ a_ck_replace(OP_PADSV,  a_ck_padsv,  &a_old_ck_padsv);
 
- a_old_ck_aelem      = PL_check[OP_AELEM];
- PL_check[OP_AELEM]  = MEMBER_TO_FPTR(a_ck_deref);
- a_old_ck_helem      = PL_check[OP_HELEM];
- PL_check[OP_HELEM]  = MEMBER_TO_FPTR(a_ck_deref);
- a_old_ck_rv2sv      = PL_check[OP_RV2SV];
- PL_check[OP_RV2SV]  = MEMBER_TO_FPTR(a_ck_deref);
+ a_ck_replace(OP_AELEM,  a_ck_deref,  &a_old_ck_aelem);
+ a_ck_replace(OP_HELEM,  a_ck_deref,  &a_old_ck_helem);
+ a_ck_replace(OP_RV2SV,  a_ck_deref,  &a_old_ck_rv2sv);
 
- a_old_ck_rv2av      = PL_check[OP_RV2AV];
- PL_check[OP_RV2AV]  = MEMBER_TO_FPTR(a_ck_rv2xv);
- a_old_ck_rv2hv      = PL_check[OP_RV2HV];
- PL_check[OP_RV2HV]  = MEMBER_TO_FPTR(a_ck_rv2xv);
+ a_ck_replace(OP_RV2AV,  a_ck_rv2xv,  &a_old_ck_rv2av);
+ a_ck_replace(OP_RV2HV,  a_ck_rv2xv,  &a_old_ck_rv2hv);
 
- a_old_ck_aslice     = PL_check[OP_ASLICE];
- PL_check[OP_ASLICE] = MEMBER_TO_FPTR(a_ck_xslice);
- a_old_ck_hslice     = PL_check[OP_HSLICE];
- PL_check[OP_HSLICE] = MEMBER_TO_FPTR(a_ck_xslice);
+ a_ck_replace(OP_ASLICE, a_ck_xslice, &a_old_ck_aslice);
+ a_ck_replace(OP_HSLICE, a_ck_xslice, &a_old_ck_hslice);
 
- a_old_ck_exists     = PL_check[OP_EXISTS];
- PL_check[OP_EXISTS] = MEMBER_TO_FPTR(a_ck_root);
- a_old_ck_delete     = PL_check[OP_DELETE];
- PL_check[OP_DELETE] = MEMBER_TO_FPTR(a_ck_root);
- a_old_ck_keys       = PL_check[OP_KEYS];
- PL_check[OP_KEYS]   = MEMBER_TO_FPTR(a_ck_root);
- a_old_ck_values     = PL_check[OP_VALUES];
- PL_check[OP_VALUES] = MEMBER_TO_FPTR(a_ck_root);
+ a_ck_replace(OP_EXISTS, a_ck_root,   &a_old_ck_exists);
+ a_ck_replace(OP_DELETE, a_ck_root,   &a_old_ck_delete);
+ a_ck_replace(OP_KEYS,   a_ck_root,   &a_old_ck_keys);
+ a_ck_replace(OP_VALUES, a_ck_root,   &a_old_ck_values);
 
 #if A_HAS_RPEEP
  a_old_peep = PL_rpeepp;
