@@ -18,7 +18,7 @@ __DATA__
 
 --- fetch ---
 
-$x # $x->{a} # '', undef, { } 
+$x # $x->{a} # '', undef, { }
 $x # $x->{a} # '', undef, undef #
 $x # $x->{a} # '', undef, undef # +fetch
 $x # $x->{a} # '', undef, { }   # +exists

@@ -34,7 +34,7 @@ our $blurp;
 
 {
  local $blurp;
- eval 'no autovivification; use autovivification::TestRequired2; $blurp->{a}'; 
+ eval 'no autovivification; use autovivification::TestRequired2; $blurp->{a}';
  is        $@,     '',      'second require test doesn\'t croak prematurely';
  my $expect;
  $expect = { r1_main => { }, r1_eval => { } };
