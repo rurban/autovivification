@@ -10,11 +10,11 @@ Test::Leaner - A slimmer Test::More for when you favor performance over complete
 
 =head1 VERSION
 
-Version 0.04
+Version 0.05
 
 =cut
 
-our $VERSION = '0.04';
+our $VERSION = '0.05';
 
 =head1 SYNOPSIS
 
@@ -273,7 +273,11 @@ sub _sanitize_comment {
 
 The following functions from L<Test::More> are implemented and exported by default.
 
-=head2 C<< plan [ tests => $count | 'no_plan' | skip_all => $reason ] >>
+=head2 C<plan>
+
+    plan tests => $count;
+    plan 'no_plan';
+    plan skip_all => $reason;
 
 See L<Test::More/plan>.
 
@@ -336,7 +340,9 @@ sub import {
  goto &Exporter::import;
 }
 
-=head2 C<< skip $reason => $count >>
+=head2 C<skip>
+
+    skip $reason => $count;
 
 See L<Test::More/skip>.
 
@@ -373,7 +379,10 @@ sub skip {
  last SKIP;
 }
 
-=head2 C<done_testing [ $count ]>
+=head2 C<done_testing>
+
+    done_testing;
+    done_testing $count;
 
 See L<Test::More/done_testing>.
 
@@ -406,7 +415,10 @@ sub done_testing {
  return 1;
 }
 
-=head2 C<ok $ok [, $desc ]>
+=head2 C<ok>
+
+    ok $ok;
+    ok $ok, $desc;
 
 See L<Test::More/ok>.
 
@@ -435,7 +447,10 @@ sub ok ($;$) {
  return $ok;
 }
 
-=head2 C<pass [ $desc ]>
+=head2 C<pass>
+
+    pass;
+    pass $desc;
 
 See L<Test::More/pass>.
 
@@ -446,7 +461,10 @@ sub pass (;$) {
  goto &ok;
 }
 
-=head2 C<fail [ $desc ]>
+=head2 C<fail>
+
+    fail;
+    fail $desc;
 
 See L<Test::More/fail>.
 
@@ -457,7 +475,10 @@ sub fail (;$) {
  goto &ok;
 }
 
-=head2 C<is $got, $expected [, $desc ]>
+=head2 C<is>
+
+    is $got, $expected;
+    is $got, $expected, $desc;
 
 See L<Test::More/is>.
 
@@ -473,7 +494,10 @@ sub is ($$;$) {
  goto &ok;
 }
 
-=head2 C<isnt $got, $expected [, $desc ]>
+=head2 C<isnt>
+
+    isnt $got, $expected;
+    isnt $got, $expected, $desc;
 
 See L<Test::More/isnt>.
 
@@ -560,11 +584,17 @@ IS_BINOP
  }
 }
 
-=head2 C<like $got, $regexp_expected [, $desc ]>
+=head2 C<like>
+
+    like $got, $regexp_expected;
+    like $got, $regexp_expected, $desc;
 
 See L<Test::More/like>.
 
-=head2 C<unlike $got, $regexp_expected, [, $desc ]>
+=head2 C<unlike>
+
+    unlike $got, $regexp_expected;
+    unlike $got, $regexp_expected, $desc;
 
 See L<Test::More/unlike>.
 
@@ -576,7 +606,10 @@ See L<Test::More/unlike>.
  *unlike = _create_binop_handler('!~');
 }
 
-=head2 C<cmp_ok $got, $op, $expected [, $desc ]>
+=head2 C<cmp_ok>
+
+    cmp_ok $got, $op, $expected;
+    cmp_ok $got, $op, $expected, $desc;
 
 See L<Test::More/cmp_ok>.
 
@@ -593,7 +626,10 @@ sub cmp_ok ($$$;$) {
  goto $handler;
 }
 
-=head2 C<is_deeply $got, $expected [, $desc ]>
+=head2 C<is_deeply>
+
+    is_deeply $got, $expected;
+    is_deeply $got, $expected, $desc;
 
 See L<Test::More/is_deeply>.
 
@@ -735,7 +771,9 @@ sub _diag_fh {
  return 0;
 };
 
-=head2 C<diag @text>
+=head2 C<diag>
+
+    diag @lines;
 
 See L<Test::More/diag>.
 
@@ -746,7 +784,9 @@ sub diag {
  goto &_diag_fh;
 }
 
-=head2 C<note @text>
+=head2 C<note>
+
+    note @lines;
 
 See L<Test::More/note>.
 
@@ -757,7 +797,10 @@ sub note {
  goto &_diag_fh;
 }
 
-=head2 C<BAIL_OUT [ $desc ]>
+=head2 C<BAIL_OUT>
+
+    BAIL_OUT;
+    BAIL_OUT $desc;
 
 See L<Test::More/BAIL_OUT>.
 
@@ -802,7 +845,10 @@ END {
 
 L<Test::Leaner> also provides some functions of its own, which are never exported.
 
-=head2 C<tap_stream [ $fh ]>
+=head2 C<tap_stream>
+
+    my $tap_fh = tap_stream;
+    tap_stream $fh;
 
 Read/write accessor for the filehandle to which the tests are outputted.
 On write, it also turns autoflush on onto C<$fh>.
@@ -827,7 +873,10 @@ sub tap_stream (;*) {
 
 tap_stream *STDOUT;
 
-=head2 C<diag_stream [ $fh ]>
+=head2 C<diag_stream>
+
+    my $diag_fh = diag_stream;
+    diag_stream $fh;
 
 Read/write accessor for the filehandle to which the diagnostics are printed.
 On write, it also turns autoflush on onto C<$fh>.
@@ -882,7 +931,7 @@ You can find documentation for this module with the perldoc command.
 
 =head1 COPYRIGHT & LICENSE
 
-Copyright 2010,2011 Vincent Pit, all rights reserved.
+Copyright 2010,2011,2013 Vincent Pit, all rights reserved.
 
 This program is free software; you can redistribute it and/or modify it under the same terms as Perl itself.
 
