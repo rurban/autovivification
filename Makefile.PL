@@ -1,4 +1,4 @@
-use 5.008003;
+use 5.008_003;
 
 use strict;
 use warnings;
@@ -34,7 +34,7 @@ if ($^O eq 'MSWin32' && "$]" < 5.009) {
 }
 
 # Fork emulation got "fixed" in 5.10.1
-if ($^O eq 'MSWin32' && "$]" < 5.010001) {
+if ($^O eq 'MSWin32' && "$]" < 5.010_001) {
  push @DEFINES, '-DA_FORKSAFE=0';
 }
 

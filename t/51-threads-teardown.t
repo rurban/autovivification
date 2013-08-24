@@ -21,7 +21,7 @@ sub run_perl {
 
 SKIP:
 {
- skip 'Fails on 5.8.2 and lower' => 1 if "$]" <= 5.008002;
+ skip 'Fails on 5.8.2 and lower' => 1 if "$]" <= 5.008_002;
 
  my $status = run_perl <<' RUN';
   my $code = 1 + 2 + 4;

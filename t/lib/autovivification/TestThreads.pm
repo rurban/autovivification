@@ -19,7 +19,7 @@ sub import {
  skip_all 'This perl wasn\'t built to support threads'
                                                     unless $Config{useithreads};
  skip_all 'perl 5.13.4 required to test thread safety'
-                                              unless $force or "$]" >= 5.013004;
+                                             unless $force or "$]" >= 5.013_004;
 
  load_or_skip_all('threads', $force ? '0' : '1.67', [ ]);
 

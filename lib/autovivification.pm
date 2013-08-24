@@ -1,6 +1,6 @@
 package autovivification;
 
-use 5.008003;
+use 5.008_003;
 
 use strict;
 use warnings;
@@ -211,7 +211,7 @@ L<perl> 5.8.3.
 A C compiler.
 This module may happen to build with a C++ compiler as well, but don't rely on it, as no guarantee is made in this regard.
 
-L<XSLoader> (standard since perl 5.006).
+L<XSLoader> (standard since perl 5.6.0).
 
 =head1 SEE ALSO
 
