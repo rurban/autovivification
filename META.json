@@ -4,7 +4,7 @@
       "Vincent Pit <perl@profvince.com>"
    ],
    "dynamic_config" : 1,
-   "generated_by" : "ExtUtils::MakeMaker version 6.64, CPAN::Meta::Converter version 2.120921",
+   "generated_by" : "ExtUtils::MakeMaker version 6.74, CPAN::Meta::Converter version 2.132140",
    "license" : [
       "perl_5"
    ],
@@ -44,7 +44,7 @@
    "release_status" : "stable",
    "resources" : {
       "bugtracker" : {
-         "web" : "http://rt.cpan.org/NoAuth/ReportBug.html?Queue=autovivification"
+         "web" : "http://rt.cpan.org/Dist/Display.html?Name=autovivification"
       },
       "homepage" : "http://search.cpan.org/dist/autovivification/",
       "license" : [
@@ -54,5 +54,5 @@
          "url" : "http://git.profvince.com/?p=perl%2Fmodules%2Fautovivification.git"
       }
    },
-   "version" : "0.11"
+   "version" : "0.12"
 }
