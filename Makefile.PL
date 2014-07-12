@@ -97,3 +97,12 @@ WriteMakefile(
  },
  %macro,
 );
+
+package MY;
+
+sub postamble {
+ return <<'POSTAMBLE';
+testdeb: all
+	PERL_DL_NONLAZY=1 PERLDB_OPTS="NonStop=1" $(FULLPERLRUN) -MTAP::Harness -e 'TAP::Harness->new({verbosity => q{$(VERBOSE)}, lib => [ q{$(INST_LIB)}, q{$(INST_ARCHLIB)} ], switches => [ q{-d} ]})->runtests(@ARGV)' $(TEST_FILES)
+POSTAMBLE
+}
