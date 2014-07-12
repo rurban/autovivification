@@ -980,11 +980,22 @@ STATIC void a_peep_rec(pTHX_ OP *o, ptable *seen) {
   const a_op_info *oi = NULL;
   UV flags = 0;
 
+#if !A_HAS_RPEEP
   if (ptable_fetch(seen, o))
    break;
   ptable_seen_store(seen, o, o);
+#endif
 
   switch (o->op_type) {
+#if A_HAS_RPEEP
+   case OP_NEXTSTATE:
+   case OP_DBSTATE:
+   case OP_STUB:
+    if (ptable_fetch(seen, o))
+     return;
+    ptable_seen_store(seen, o, o);
+    break;
+#endif
    case OP_PADSV:
     if (o->op_ppaddr != a_pp_deref) {
      oi = a_map_fetch(o);
