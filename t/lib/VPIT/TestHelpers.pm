@@ -3,9 +3,12 @@ package VPIT::TestHelpers;
 use strict;
 use warnings;
 
+use Config ();
+
 my %exports = (
  load_or_skip     => \&load_or_skip,
  load_or_skip_all => \&load_or_skip_all,
+ run_perl         => \&run_perl,
  skip_all         => \&skip_all,
 );
 
@@ -100,6 +103,21 @@ sub load_or_skip_all {
  skip_all $err unless $loaded;
 
  return $loaded;
+}
+
+sub run_perl {
+ my $code = shift;
+
+ my ($SystemRoot, $PATH) = @ENV{qw<SystemRoot PATH>};
+ my $ld_name  = $Config::Config{ldlibpthname};
+ my $ldlibpth = $ENV{$ld_name};
+
+ local %ENV;
+ $ENV{SystemRoot} = $SystemRoot if $^O eq 'MSWin32' and defined $SystemRoot;
+ $ENV{PATH}       = $PATH       if $^O eq 'cygwin'  and defined $PATH;
+ $ENV{$ld_name}   = $ldlibpth   if $^O eq 'android' and defined $ldlibpth;
+
+ system { $^X } $^X, '-T', map("-I$_", @INC), '-e', $code;
 }
 
 package VPIT::TestHelpers::Guard;
