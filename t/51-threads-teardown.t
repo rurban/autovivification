@@ -7,7 +7,7 @@ use lib 't/lib';
 use VPIT::TestHelpers;
 use autovivification::TestThreads;
 
-use Test::Leaner tests => 1;
+use Test::Leaner tests => 2;
 
 SKIP:
 {
@@ -26,4 +26,22 @@ SKIP:
   exit $code;
  RUN
  is $status, 0, 'loading the pragma in a thread and using it outside doesn\'t segfault';
+}
+
+{
+ my $status = run_perl <<' RUN';
+  use threads;
+  BEGIN { require autovivification; }
+  sub X::DESTROY {
+   eval 'no autovivification; my $x; my $y = $x->{foo}{bar}; use autovivification; my $z = $x->{a}{b}{c};';
+   exit 1 if $@;
+  }
+  threads->create(sub {
+   my $x = bless { }, 'X';
+   $x->{self} = $x;
+   return;
+  })->join;
+  exit $code;
+ RUN
+ is $status, 0, 'autovivification can be loaded in eval STRING during global destruction at the end of a thread';
 }

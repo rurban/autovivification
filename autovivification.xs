@@ -295,19 +295,22 @@ get_enclosing_cv:
 STATIC SV *a_tag(pTHX_ UV bits) {
 #define a_tag(B) a_tag(aTHX_ (B))
  a_hint_t *h;
+#if A_THREADSAFE
+ dMY_CXT;
+
+ if (!MY_CXT.tbl)
+  return newSViv(0);
+#endif /* A_THREADSAFE */
 
  h              = PerlMemShared_malloc(sizeof *h);
  h->bits        = bits;
  h->require_tag = a_require_tag();
 
 #if A_THREADSAFE
- {
-  dMY_CXT;
-  /* We only need for the key to be an unique tag for looking up the value later
-   * Allocated memory provides convenient unique identifiers, so that's why we
-   * use the hint as the key itself. */
-  ptable_hints_store(MY_CXT.tbl, h, h);
- }
+ /* We only need for the key to be an unique tag for looking up the value later
+  * Allocated memory provides convenient unique identifiers, so that's why we
+  * use the hint as the key itself. */
+ ptable_hints_store(MY_CXT.tbl, h, h);
 #endif /* A_THREADSAFE */
 
  return newSViv(PTR2IV(h));
@@ -316,16 +319,19 @@ STATIC SV *a_tag(pTHX_ UV bits) {
 STATIC UV a_detag(pTHX_ const SV *hint) {
 #define a_detag(H) a_detag(aTHX_ (H))
  a_hint_t *h;
+#if A_THREADSAFE
+ dMY_CXT;
+
+ if (!MY_CXT.tbl)
+  return 0;
+#endif /* A_THREADSAFE */
 
  if (!(hint && SvIOK(hint)))
   return 0;
 
  h = INT2PTR(a_hint_t *, SvIVX(hint));
 #if A_THREADSAFE
- {
-  dMY_CXT;
-  h = ptable_fetch(MY_CXT.tbl, h);
- }
+ h = ptable_fetch(MY_CXT.tbl, h);
 #endif /* A_THREADSAFE */
 
  if (a_require_tag() != h->require_tag)
@@ -1107,9 +1113,11 @@ STATIC void a_peep(pTHX_ OP *o) {
 
  a_old_peep(aTHX_ o);
 
- ptable_seen_clear(seen);
- a_peep_rec(o);
- ptable_seen_clear(seen);
+ if (seen) {
+  ptable_seen_clear(seen);
+  a_peep_rec(o);
+  ptable_seen_clear(seen);
+ }
 }
 
 /* --- Interpreter setup/teardown ------------------------------------------ */
