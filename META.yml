@@ -3,30 +3,30 @@ abstract: 'Lexically disable autovivification.'
 author:
   - 'Vincent Pit <perl@profvince.com>'
 build_requires:
-  Config: 0
-  Exporter: 0
-  ExtUtils::MakeMaker: 0
-  Test::More: 0
-  XSLoader: 0
+  Config: '0'
+  Exporter: '0'
+  ExtUtils::MakeMaker: '0'
+  Test::More: '0'
+  XSLoader: '0'
 configure_requires:
-  ExtUtils::MakeMaker: 0
+  ExtUtils::MakeMaker: '0'
 dynamic_config: 1
-generated_by: 'ExtUtils::MakeMaker version 6.74, CPAN::Meta::Converter version 2.132140'
+generated_by: 'ExtUtils::MakeMaker version 6.98, CPAN::Meta::Converter version 2.142690'
 license: perl
 meta-spec:
   url: http://module-build.sourceforge.net/META-spec-v1.4.html
-  version: 1.4
+  version: '1.4'
 name: autovivification
 no_index:
   directory:
     - t
     - inc
 requires:
-  XSLoader: 0
-  perl: 5.008003
+  XSLoader: '0'
+  perl: '5.008003'
 resources:
   bugtracker: http://rt.cpan.org/Dist/Display.html?Name=autovivification
   homepage: http://search.cpan.org/dist/autovivification/
   license: http://dev.perl.org/licenses/
   repository: http://git.profvince.com/?p=perl%2Fmodules%2Fautovivification.git
-version: 0.12
+version: '0.13'

@@ -2,7 +2,7 @@ NAME
     autovivification - Lexically disable autovivification.
 
 VERSION
-    Version 0.12
+    Version 0.13
 
 SYNOPSIS
         no autovivification;
@@ -138,12 +138,21 @@ CONSTANTS
     where it is false for perl 5.10.0 and below.
 
 CAVEATS
+    Using this pragma will cause a slight global slowdown of any subsequent
+    compilation phase that happens anywere in your code - even outside of
+    the scope of use of "no autovivification" - which may become noticeable
+    if you rely heavily on numerous calls to "eval STRING".
+
     The pragma doesn't apply when one dereferences the returned value of an
     array or hash slice, as in "@array[$id]->{member}" or
     @hash{$key}->{member}. This syntax is valid Perl, yet it is discouraged
     as the slice is here useless since the dereferencing enforces scalar
     context. If warnings are turned on, Perl will complain about one-element
     slices.
+
+    Autovivifications that happen in code "eval"'d during the global
+    destruction phase of a spawned thread or pseudo-fork (the processes used
+    internally for the "fork" emulation on Windows) are not reported.
 
 DEPENDENCIES
     perl 5.8.3.
@@ -180,7 +189,8 @@ ACKNOWLEDGEMENTS
     Matt S. Trout asked for it.
 
 COPYRIGHT & LICENSE
-    Copyright 2009,2010,2011,2012,2013 Vincent Pit, all rights reserved.
+    Copyright 2009,2010,2011,2012,2013,2014 Vincent Pit, all rights
+    reserved.
 
     This program is free software; you can redistribute it and/or modify it
     under the same terms as Perl itself.

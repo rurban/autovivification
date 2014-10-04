@@ -1,5 +1,25 @@
 Revision history for autovivification
 
+0.13    2014-10-04 16:55 UTC
+        This release contains a change that, while being very likely to be safe,
+        can potentially cause freezes during code compilation. Every release
+        should be carefully tested before being put in production, but this is
+        especially true for this one.
+        + Add : Support for the PERL_OP_PARENT optional feature introduced in
+                perl 5.21.2.
+        + Doc : The CAVEATS section now warns about the global slowdown during
+                compilation caused by this pragma.
+        + Fix : [RT #97703] : Android support
+                t/51-threads-teardown.t will no longer fail on Android.
+                Thanks Brian Fraser for reporting.
+        + Fix : Segfaults in eval in an END block of a Win32 pseudo-fork.
+        + Fix : Segfaults during global destruction of a thread or a
+                pseudo-fork.
+        + Opt : The global slowdown caused by this module has been greatly
+                reduced.
+                Thanks Ævar Arnfjörð Bjarmason for reporting and testing the
+                change.
+
 0.12    2013-09-05 17:20 UTC
         + Fix : Check functions are now replaced and restored in a thread-safe
                 manner, either by using the wrap_op_checker() function from perl

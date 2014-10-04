@@ -4,7 +4,7 @@
       "Vincent Pit <perl@profvince.com>"
    ],
    "dynamic_config" : 1,
-   "generated_by" : "ExtUtils::MakeMaker version 6.74, CPAN::Meta::Converter version 2.132140",
+   "generated_by" : "ExtUtils::MakeMaker version 6.98, CPAN::Meta::Converter version 2.142690",
    "license" : [
       "perl_5"
    ],
@@ -54,5 +54,5 @@
          "url" : "http://git.profvince.com/?p=perl%2Fmodules%2Fautovivification.git"
       }
    },
-   "version" : "0.12"
+   "version" : "0.13"
 }
