@@ -210,8 +210,6 @@ STATIC void a_ptable_clone(pTHX_ ptable_ent *ent, void *ud_) {
 
 #endif /* A_WORKAROUND_REQUIRE_PROPAGATION */
 
-#include "reap.h"
-
 STATIC void a_thread_cleanup(pTHX_ void *ud) {
  dMY_CXT;
 
@@ -220,6 +218,29 @@ STATIC void a_thread_cleanup(pTHX_ void *ud) {
 #endif /* A_WORKAROUND_REQUIRE_PROPAGATION */
  ptable_seen_free(MY_CXT.seen);
 }
+
+STATIC int a_endav_free(pTHX_ SV *sv, MAGIC *mg) {
+ SAVEDESTRUCTOR_X(a_thread_cleanup, NULL);
+
+ return 0;
+}
+
+STATIC MGVTBL a_endav_vtbl = {
+ 0,
+ 0,
+ 0,
+ 0,
+ a_endav_free
+#if MGf_COPY
+ , 0
+#endif
+#if MGf_DUP
+ , 0
+#endif
+#if MGf_LOCAL
+ , 0
+#endif
+};
 
 #endif /* A_THREADSAFE */
 
@@ -1233,6 +1254,7 @@ PREINIT:
  ptable *t;
 #endif
  ptable *s;
+ GV     *gv;
 PPCODE:
  {
   dMY_CXT;
@@ -1256,7 +1278,23 @@ PPCODE:
 #endif
   MY_CXT.seen  = s;
  }
- reap(3, a_thread_cleanup, NULL);
+ gv = gv_fetchpv(__PACKAGE__ "::_THREAD_CLEANUP", 0, SVt_PVCV);
+ if (gv) {
+  CV *cv = GvCV(gv);
+  if (!PL_endav)
+   PL_endav = newAV();
+  SvREFCNT_inc(cv);
+  if (!av_store(PL_endav, av_len(PL_endav) + 1, (SV *) cv))
+   SvREFCNT_dec(cv);
+  sv_magicext((SV *) PL_endav, NULL, PERL_MAGIC_ext, &a_endav_vtbl, NULL, 0);
+ }
+ XSRETURN(0);
+
+void
+_THREAD_CLEANUP(...)
+PROTOTYPE: DISABLE
+PPCODE:
+ a_thread_cleanup(aTHX_ NULL);
  XSRETURN(0);
 
 #endif /* A_THREADSAFE */

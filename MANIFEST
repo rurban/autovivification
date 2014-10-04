@@ -7,7 +7,6 @@ README
 autovivification.xs
 lib/autovivification.pm
 ptable.h
-reap.h
 samples/bench.pl
 samples/hash2array.pl
 t/00-load.t
