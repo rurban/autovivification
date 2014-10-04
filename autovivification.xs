@@ -1273,8 +1273,8 @@ PREINIT:
  GV     *gv;
 PPCODE:
  {
-  dMY_CXT;
 #if A_WORKAROUND_REQUIRE_PROPAGATION
+  dMY_CXT;
   {
    a_ptable_clone_ud ud;
 
