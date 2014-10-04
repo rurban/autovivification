@@ -215,8 +215,10 @@ STATIC void a_thread_cleanup(pTHX_ void *ud) {
 
 #if A_WORKAROUND_REQUIRE_PROPAGATION
  ptable_hints_free(MY_CXT.tbl);
+ MY_CXT.tbl  = NULL;
 #endif /* A_WORKAROUND_REQUIRE_PROPAGATION */
  ptable_seen_free(MY_CXT.seen);
+ MY_CXT.seen = NULL;
 }
 
 STATIC int a_endav_free(pTHX_ SV *sv, MAGIC *mg) {
@@ -1128,8 +1130,10 @@ STATIC void a_teardown(pTHX_ void *root) {
   dMY_CXT;
 # if A_THREADSAFE && A_WORKAROUND_REQUIRE_PROPAGATION
   ptable_hints_free(MY_CXT.tbl);
+  MY_CXT.tbl  = NULL;
 # endif /* A_THREADSAFE && A_WORKAROUND_REQUIRE_PROPAGATION */
   ptable_seen_free(MY_CXT.seen);
+  MY_CXT.seen = NULL;
  }
 
  a_ck_restore(OP_PADANY, &a_old_ck_padany);
