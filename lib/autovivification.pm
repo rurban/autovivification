@@ -200,6 +200,8 @@ This constant will always be true, except on Windows where it is false for perl 
 
 =head1 CAVEATS
 
+Using this pragma will cause a slight global slowdown of any subsequent compilation phase that happens anywere in your code - even outside of the scope of use of C<no autovivification> - which may become noticeable if you rely heavily on numerous calls to C<eval STRING>.
+
 The pragma doesn't apply when one dereferences the returned value of an array or hash slice, as in C<< @array[$id]->{member} >> or C<< @hash{$key}->{member} >>.
 This syntax is valid Perl, yet it is discouraged as the slice is here useless since the dereferencing enforces scalar context.
 If warnings are turned on, Perl will complain about one-element slices.
