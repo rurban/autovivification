@@ -1,9 +1,14 @@
-#!perl -T
+#!perl
 
 use strict;
 use warnings;
 
-use Test::More tests => 11 + 6 * 3;
+use Test::More;
+
+use lib 't/lib';
+use VPIT::TestHelpers;
+
+plan tests => 11 + 1 * 2 + 5 * 3;
 
 {
  my $desc = 'peephole optimization of conditionals';
@@ -108,26 +113,26 @@ use Test::More tests => 11 + 6 * 3;
 }
 
 {
- my $desc = 'peephole optimization of empty loops (RT #64435)';
- my $x;
-
- local $@;
- my $code = eval <<' TESTCASE';
-  no autovivification;
-  sub {
+ my %infinite_tests = (
+  'peephole optimization of infinite for loops (RT #64435)' => <<'  TESTCASE',
+   no autovivification;
    my $ret = 0;
    for (;;) {
     ++$ret;
-    return $ret;
+    exit $ret;
    }
-   return $ret;
-  }
- TESTCASE
- is $@, '', "$desc compiled fine";
+   exit $ret;
+  TESTCASE
+ );
 
- my $ret = $code->();
- is_deeply $x, undef, "$desc did not autovivify";
- is      $ret, 1,     "$desc returned 1";
+ for my $desc (keys %infinite_tests) {
+  my $code = $infinite_tests{$desc};
+  my $ret  = run_perl $code;
+  my $stat = $ret & 255;
+  $ret   >>= 8;
+  is $stat, 0, "$desc testcase did not crash";
+  is $ret,  1, "$desc compiled fine";
+ }
 }
 
 {
