@@ -1,5 +1,16 @@
 Revision history for autovivification
 
+0.14    2014-11-01 22:25 UTC
+        + Fix : [RT #99458] : AnyEvent::Loop hangs if autovivification 0.13 is
+                loaded
+                [RT #99904] : 'no autovivification' breaks Lingua::EN::Inflect
+                from a distance
+                This was a regression in 0.13 which caused the peephole
+                optimizer to loop infinitely on "... while 1" constructs.
+                However, the Lingua::EN::Inflect problem only occured in perl
+                5.20 and above.
+                Thanks Toshio Ito and Kent Fredric for reporting.
+
 0.13    2014-10-04 16:55 UTC
         This release contains a change that, while being very likely to be safe,
         can potentially cause freezes during code compilation. Every release
