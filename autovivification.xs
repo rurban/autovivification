@@ -1024,6 +1024,7 @@ STATIC void a_peep_rec(pTHX_ OP *o, ptable *seen) {
    case OP_NEXTSTATE:
    case OP_DBSTATE:
    case OP_STUB:
+   case OP_UNSTACK:
     if (ptable_fetch(seen, o))
      return;
     ptable_seen_store(seen, o, o);

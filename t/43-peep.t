@@ -8,7 +8,7 @@ use Test::More;
 use lib 't/lib';
 use VPIT::TestHelpers;
 
-plan tests => 11 + 1 * 2 + 5 * 3;
+plan tests => 11 + 5 * 2 + 5 * 3;
 
 {
  my $desc = 'peephole optimization of conditionals';
@@ -113,14 +113,45 @@ plan tests => 11 + 1 * 2 + 5 * 3;
 }
 
 {
+ my $base_desc = 'peephole optimization of infinite';
  my %infinite_tests = (
-  'peephole optimization of infinite for loops (RT #64435)' => <<'  TESTCASE',
+  "$base_desc for loops (RT #64435)" => <<'  TESTCASE',
    no autovivification;
    my $ret = 0;
    for (;;) {
     ++$ret;
     exit $ret;
    }
+   exit $ret;
+  TESTCASE
+  "$base_desc while loops" => <<'  TESTCASE',
+   no autovivification;
+   my $ret = 0;
+   while (1) {
+    ++$ret;
+    exit $ret;
+   }
+   exit $ret;
+  TESTCASE
+  "$base_desc postfix while (RT #99458)" => <<'  TESTCASE',
+   no autovivification;
+   my $ret = 0;
+   ++$ret && exit $ret while 1;
+   exit $ret;
+  TESTCASE
+  "$base_desc until loops" => <<'  TESTCASE',
+   no autovivification;
+   my $ret = 0;
+   until (0) {
+    ++$ret;
+    exit $ret;
+   }
+   exit $ret;
+  TESTCASE
+  "$base_desc postfix until" => <<'  TESTCASE',
+   no autovivification;
+   my $ret = 0;
+   ++$ret && exit $ret until 0;
    exit $ret;
   TESTCASE
  );
