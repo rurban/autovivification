@@ -29,8 +29,12 @@
 # define A_HAS_RPEEP A_HAS_PERL(5, 13, 5)
 #endif
 
-#ifndef OP_SIBLING
-# define OP_SIBLING(O) ((O)->op_sibling)
+#ifndef OpSIBLING
+# ifdef OP_SIBLING
+#  define OpSIBLING(O) OP_SIBLING(O)
+# else
+#  define OpSIBLING(O) ((O)->op_sibling)
+# endif
 #endif
 
 /* ... Thread safety and multiplicity ...................................... */
@@ -933,7 +937,7 @@ STATIC OP *a_ck_xslice(pTHX_ OP *o) {
   case OP_HSLICE:
    old_ck = a_old_ck_hslice;
    if (hint & A_HINT_DO)
-    a_recheck_rv2xv(OP_SIBLING(cUNOPo->op_first), OP_RV2HV, a_pp_rv2hv);
+    a_recheck_rv2xv(OpSIBLING(cUNOPo->op_first), OP_RV2HV, a_pp_rv2hv);
    break;
  }
  o = old_ck(aTHX_ o);
