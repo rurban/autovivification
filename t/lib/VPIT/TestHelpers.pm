@@ -113,9 +113,9 @@ sub run_perl {
  my $ldlibpth = $ENV{$ld_name};
 
  local %ENV;
+ $ENV{$ld_name}   = $ldlibpth   if                      defined $ldlibpth;
  $ENV{SystemRoot} = $SystemRoot if $^O eq 'MSWin32' and defined $SystemRoot;
  $ENV{PATH}       = $PATH       if $^O eq 'cygwin'  and defined $PATH;
- $ENV{$ld_name}   = $ldlibpth   if $^O eq 'android' and defined $ldlibpth;
 
  system { $^X } $^X, '-T', map("-I$_", @INC), '-e', $code;
 }
