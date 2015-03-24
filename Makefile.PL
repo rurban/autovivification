@@ -23,7 +23,16 @@ if ($^O eq 'MSWin32' and not grep /^LD[A-Z]*=/, @ARGV) {
                   @Config{qw<bin sitebin>};
   $macro{LDDLFLAGS}    = "$lddlflags $libdirs $libperl";
   $macro{LDFLAGS}      = "$ldflags $libdirs $libperl";
-  $macro{PERL_ARCHIVE} = '',
+  eval <<'  MY_SECTION';
+   package MY;
+   sub dynamic_lib {
+    my $self = shift;
+    my $inherited = $self->SUPER::dynamic_lib(@_);
+    $inherited =~ s/"?\$\(PERL_ARCHIVE\)"?//g;
+    return $inherited;
+   }
+  MY_SECTION
+  die $@ if $@;
  }
 }
 print $is_gcc_34 ? "yes\n" : "no\n";
