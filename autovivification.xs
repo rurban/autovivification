@@ -76,7 +76,7 @@
 # undef  MY_CXT
 # define MY_CXT       a_globaldata
 # undef  START_MY_CXT
-# define START_MY_CXT STATIC my_cxt_t MY_CXT;
+# define START_MY_CXT static my_cxt_t MY_CXT;
 # undef  MY_CXT_INIT
 # define MY_CXT_INIT  NOOP
 # undef  MY_CXT_CLONE
@@ -99,7 +99,7 @@ typedef OP *(*a_ck_t)(pTHX_ OP *);
 
 #else
 
-STATIC void a_ck_replace(pTHX_ OPCODE type, a_ck_t new_ck, a_ck_t *old_ck_p) {
+static void a_ck_replace(pTHX_ OPCODE type, a_ck_t new_ck, a_ck_t *old_ck_p) {
 #define a_ck_replace(T, NC, OCP) a_ck_replace(aTHX_ (T), (NC), (OCP))
  A_CHECK_MUTEX_LOCK;
  if (!*old_ck_p) {
@@ -111,7 +111,7 @@ STATIC void a_ck_replace(pTHX_ OPCODE type, a_ck_t new_ck, a_ck_t *old_ck_p) {
 
 #endif
 
-STATIC void a_ck_restore(pTHX_ OPCODE type, a_ck_t *old_ck_p) {
+static void a_ck_restore(pTHX_ OPCODE type, a_ck_t *old_ck_p) {
 #define a_ck_restore(T, OCP) a_ck_restore(aTHX_ (T), (OCP))
  A_CHECK_MUTEX_LOCK;
  if (*old_ck_p) {
@@ -204,7 +204,7 @@ typedef struct {
 # define a_dup_inc(S, U)             SvREFCNT_inc(sv_dup((S), &((U)->params)))
 #endif
 
-STATIC void a_ptable_clone(pTHX_ ptable_ent *ent, void *ud_) {
+static void a_ptable_clone(pTHX_ ptable_ent *ent, void *ud_) {
  a_ptable_clone_ud *ud = ud_;
  a_hint_t *h1 = ent->val;
  a_hint_t *h2;
@@ -218,7 +218,7 @@ STATIC void a_ptable_clone(pTHX_ ptable_ent *ent, void *ud_) {
 
 #endif /* A_WORKAROUND_REQUIRE_PROPAGATION */
 
-STATIC void a_thread_cleanup(pTHX_ void *ud) {
+static void a_thread_cleanup(pTHX_ void *ud) {
  dMY_CXT;
 
 #if A_WORKAROUND_REQUIRE_PROPAGATION
@@ -229,13 +229,13 @@ STATIC void a_thread_cleanup(pTHX_ void *ud) {
  MY_CXT.seen = NULL;
 }
 
-STATIC int a_endav_free(pTHX_ SV *sv, MAGIC *mg) {
+static int a_endav_free(pTHX_ SV *sv, MAGIC *mg) {
  SAVEDESTRUCTOR_X(a_thread_cleanup, NULL);
 
  return 0;
 }
 
-STATIC MGVTBL a_endav_vtbl = {
+static MGVTBL a_endav_vtbl = {
  0,
  0,
  0,
@@ -256,7 +256,7 @@ STATIC MGVTBL a_endav_vtbl = {
 
 #if A_WORKAROUND_REQUIRE_PROPAGATION
 
-STATIC IV a_require_tag(pTHX) {
+static IV a_require_tag(pTHX) {
 #define a_require_tag() a_require_tag(aTHX)
  const CV *cv, *outside;
 
@@ -300,7 +300,7 @@ get_enclosing_cv:
  return PTR2IV(cv);
 }
 
-STATIC SV *a_tag(pTHX_ UV bits) {
+static SV *a_tag(pTHX_ UV bits) {
 #define a_tag(B) a_tag(aTHX_ (B))
  a_hint_t *h;
 #if A_THREADSAFE
@@ -324,7 +324,7 @@ STATIC SV *a_tag(pTHX_ UV bits) {
  return newSViv(PTR2IV(h));
 }
 
-STATIC UV a_detag(pTHX_ const SV *hint) {
+static UV a_detag(pTHX_ const SV *hint) {
 #define a_detag(H) a_detag(aTHX_ (H))
  a_hint_t *h;
 #if A_THREADSAFE
@@ -381,9 +381,9 @@ STATIC UV a_detag(pTHX_ const SV *hint) {
 #define A_HINT_ROOT   64
 #define A_HINT_DEREF  128
 
-STATIC U32 a_hash = 0;
+static U32 a_hash = 0;
 
-STATIC UV a_hint(pTHX) {
+static UV a_hint(pTHX) {
 #define a_hint() a_hint(aTHX)
  SV *hint;
 #ifdef cop_hints_fetch_pvn
@@ -420,18 +420,18 @@ typedef struct {
 #define ptable_map_store(T, K, V) ptable_map_store(aPTBLMS_ (T), (K), (V))
 #define ptable_map_delete(T, K)   ptable_map_delete(aPTBLMS_ (T), (K))
 
-STATIC ptable *a_op_map = NULL;
+static ptable *a_op_map = NULL;
 
 #ifdef USE_ITHREADS
 
 #define dA_MAP_THX a_op_info a_op_map_tmp_oi
 
-STATIC perl_mutex a_op_map_mutex;
+static perl_mutex a_op_map_mutex;
 
 #define A_LOCK(M)   MUTEX_LOCK(M)
 #define A_UNLOCK(M) MUTEX_UNLOCK(M)
 
-STATIC const a_op_info *a_map_fetch(const OP *o, a_op_info *oi) {
+static const a_op_info *a_map_fetch(const OP *o, a_op_info *oi) {
  const a_op_info *val;
 
  A_LOCK(&a_op_map_mutex);
@@ -460,7 +460,7 @@ STATIC const a_op_info *a_map_fetch(const OP *o, a_op_info *oi) {
 
 #endif /* !USE_ITHREADS */
 
-STATIC const a_op_info *a_map_store_locked(pPTBLMS_ const OP *o, OP *(*old_pp)(pTHX), void *next, UV flags) {
+static const a_op_info *a_map_store_locked(pPTBLMS_ const OP *o, OP *(*old_pp)(pTHX), void *next, UV flags) {
 #define a_map_store_locked(O, PP, N, F) a_map_store_locked(aPTBLMS_ (O), (PP), (N), (F))
  a_op_info *oi;
 
@@ -476,7 +476,7 @@ STATIC const a_op_info *a_map_store_locked(pPTBLMS_ const OP *o, OP *(*old_pp)(p
  return oi;
 }
 
-STATIC void a_map_store(pPTBLMS_ const OP *o, OP *(*old_pp)(pTHX), void *next, UV flags) {
+static void a_map_store(pPTBLMS_ const OP *o, OP *(*old_pp)(pTHX), void *next, UV flags) {
 #define a_map_store(O, PP, N, F) a_map_store(aPTBLMS_ (O), (PP), (N), (F))
  A_LOCK(&a_op_map_mutex);
 
@@ -485,7 +485,7 @@ STATIC void a_map_store(pPTBLMS_ const OP *o, OP *(*old_pp)(pTHX), void *next, U
  A_UNLOCK(&a_op_map_mutex);
 }
 
-STATIC void a_map_delete(pTHX_ const OP *o) {
+static void a_map_delete(pTHX_ const OP *o) {
 #define a_map_delete(O) a_map_delete(aTHX_ (O))
  A_LOCK(&a_op_map_mutex);
 
@@ -494,7 +494,7 @@ STATIC void a_map_delete(pTHX_ const OP *o) {
  A_UNLOCK(&a_op_map_mutex);
 }
 
-STATIC const OP *a_map_descend(const OP *o) {
+static const OP *a_map_descend(const OP *o) {
  switch (PL_opargs[o->op_type] & OA_CLASS_MASK) {
   case OA_BASEOP:
   case OA_UNOP:
@@ -509,7 +509,7 @@ STATIC const OP *a_map_descend(const OP *o) {
  return NULL;
 }
 
-STATIC void a_map_store_root(pPTBLMS_ const OP *root, OP *(*old_pp)(pTHX), UV flags) {
+static void a_map_store_root(pPTBLMS_ const OP *root, OP *(*old_pp)(pTHX), UV flags) {
 #define a_map_store_root(R, PP, F) a_map_store_root(aPTBLMS_ (R), (PP), (F))
  const a_op_info *roi;
  a_op_info *oi;
@@ -535,7 +535,7 @@ STATIC void a_map_store_root(pPTBLMS_ const OP *root, OP *(*old_pp)(pTHX), UV fl
  return;
 }
 
-STATIC void a_map_update_flags_topdown(const OP *root, UV flags) {
+static void a_map_update_flags_topdown(const OP *root, UV flags) {
  a_op_info *oi;
  const OP *o = root;
 
@@ -558,7 +558,7 @@ STATIC void a_map_update_flags_topdown(const OP *root, UV flags) {
 
 #define a_map_cancel(R) a_map_update_flags_topdown((R), 0)
 
-STATIC void a_map_update_flags_bottomup(const OP *o, UV flags, UV rflags) {
+static void a_map_update_flags_bottomup(const OP *o, UV flags, UV rflags) {
  a_op_info *oi;
 
  A_LOCK(&a_op_map_mutex);
@@ -580,7 +580,7 @@ STATIC void a_map_update_flags_bottomup(const OP *o, UV flags, UV rflags) {
 
 /* ... Decide whether this expression should be autovivified or not ........ */
 
-STATIC UV a_map_resolve(const OP *o, const a_op_info *oi) {
+static UV a_map_resolve(const OP *o, const a_op_info *oi) {
  UV flags = 0, rflags;
  const OP *root;
  const a_op_info *roi = oi;
@@ -615,7 +615,7 @@ cancel:
 
 /* ... Inspired from pp_defined() .......................................... */
 
-STATIC int a_undef(pTHX_ SV *sv) {
+static int a_undef(pTHX_ SV *sv) {
 #define a_undef(S) a_undef(aTHX_ (S))
  switch (SvTYPE(sv)) {
   case SVt_NULL:
@@ -649,7 +649,7 @@ STATIC int a_undef(pTHX_ SV *sv) {
 
 /* ... pp_rv2av ............................................................ */
 
-STATIC OP *a_pp_rv2av(pTHX) {
+static OP *a_pp_rv2av(pTHX) {
  dA_MAP_THX;
  const a_op_info *oi;
  dSP;
@@ -673,7 +673,7 @@ STATIC OP *a_pp_rv2av(pTHX) {
 
 /* ... pp_rv2hv ............................................................ */
 
-STATIC OP *a_pp_rv2hv_simple(pTHX) {
+static OP *a_pp_rv2hv_simple(pTHX) {
  dA_MAP_THX;
  const a_op_info *oi;
  dSP;
@@ -688,7 +688,7 @@ STATIC OP *a_pp_rv2hv_simple(pTHX) {
  return oi->old_pp(aTHX);
 }
 
-STATIC OP *a_pp_rv2hv(pTHX) {
+static OP *a_pp_rv2hv(pTHX) {
  dA_MAP_THX;
  const a_op_info *oi;
  dSP;
@@ -710,7 +710,7 @@ STATIC OP *a_pp_rv2hv(pTHX) {
 
 /* ... pp_deref (aelem,helem,rv2sv,padsv) .................................. */
 
-STATIC OP *a_pp_deref(pTHX) {
+static OP *a_pp_deref(pTHX) {
  dA_MAP_THX;
  const a_op_info *oi;
  UV flags;
@@ -744,7 +744,7 @@ STATIC OP *a_pp_deref(pTHX) {
 
 /* ... pp_root (exists,delete,keys,values) ................................. */
 
-STATIC OP *a_pp_root_unop(pTHX) {
+static OP *a_pp_root_unop(pTHX) {
  dSP;
 
  if (a_undef(TOPs)) {
@@ -764,7 +764,7 @@ STATIC OP *a_pp_root_unop(pTHX) {
  }
 }
 
-STATIC OP *a_pp_root_binop(pTHX) {
+static OP *a_pp_root_binop(pTHX) {
  dSP;
 
  if (a_undef(TOPm1s)) {
@@ -785,7 +785,7 @@ STATIC OP *a_pp_root_binop(pTHX) {
 
 /* --- Check functions ----------------------------------------------------- */
 
-STATIC void a_recheck_rv2xv(pTHX_ OP *o, OPCODE type, OP *(*new_pp)(pTHX)) {
+static void a_recheck_rv2xv(pTHX_ OP *o, OPCODE type, OP *(*new_pp)(pTHX)) {
 #define a_recheck_rv2xv(O, T, PP) a_recheck_rv2xv(aTHX_ (O), (T), (PP))
 
  if (o->op_type == type && o->op_ppaddr != new_pp
@@ -808,9 +808,9 @@ STATIC void a_recheck_rv2xv(pTHX_ OP *o, OPCODE type, OP *(*new_pp)(pTHX)) {
  * the op entry in the op map in the padany check function, and we set their
  * op_ppaddr member in our peephole optimizer replacement below. */
 
-STATIC OP *(*a_old_ck_padany)(pTHX_ OP *) = 0;
+static OP *(*a_old_ck_padany)(pTHX_ OP *) = 0;
 
-STATIC OP *a_ck_padany(pTHX_ OP *o) {
+static OP *a_ck_padany(pTHX_ OP *o) {
  UV hint;
 
  o = a_old_ck_padany(aTHX_ o);
@@ -824,9 +824,9 @@ STATIC OP *a_ck_padany(pTHX_ OP *o) {
  return o;
 }
 
-STATIC OP *(*a_old_ck_padsv)(pTHX_ OP *) = 0;
+static OP *(*a_old_ck_padsv)(pTHX_ OP *) = 0;
 
-STATIC OP *a_ck_padsv(pTHX_ OP *o) {
+static OP *a_ck_padsv(pTHX_ OP *o) {
  UV hint;
 
  o = a_old_ck_padsv(aTHX_ o);
@@ -848,11 +848,11 @@ STATIC OP *a_ck_padsv(pTHX_ OP *o) {
  * modifying context, so the expression can't be resolved yet. It will be at the
  * first invocation of a_pp_deref() for this expression. */
 
-STATIC OP *(*a_old_ck_aelem)(pTHX_ OP *) = 0;
-STATIC OP *(*a_old_ck_helem)(pTHX_ OP *) = 0;
-STATIC OP *(*a_old_ck_rv2sv)(pTHX_ OP *) = 0;
+static OP *(*a_old_ck_aelem)(pTHX_ OP *) = 0;
+static OP *(*a_old_ck_helem)(pTHX_ OP *) = 0;
+static OP *(*a_old_ck_rv2sv)(pTHX_ OP *) = 0;
 
-STATIC OP *a_ck_deref(pTHX_ OP *o) {
+static OP *a_ck_deref(pTHX_ OP *o) {
  OP * (*old_ck)(pTHX_ OP *o) = 0;
  UV hint = a_hint();
 
@@ -889,10 +889,10 @@ STATIC OP *a_ck_deref(pTHX_ OP *o) {
  * rv2[ah]v, resolution is handled by the first call to a_pp_deref() in the
  * expression. */
 
-STATIC OP *(*a_old_ck_rv2av)(pTHX_ OP *) = 0;
-STATIC OP *(*a_old_ck_rv2hv)(pTHX_ OP *) = 0;
+static OP *(*a_old_ck_rv2av)(pTHX_ OP *) = 0;
+static OP *(*a_old_ck_rv2hv)(pTHX_ OP *) = 0;
 
-STATIC OP *a_ck_rv2xv(pTHX_ OP *o) {
+static OP *a_ck_rv2xv(pTHX_ OP *o) {
  OP * (*old_ck)(pTHX_ OP *o) = 0;
  OP * (*new_pp)(pTHX)        = 0;
  UV hint;
@@ -923,10 +923,10 @@ STATIC OP *a_ck_rv2xv(pTHX_ OP *o) {
  * root so that the rest of the expression will see the right context when
  * resolving. That's why we don't replace the ppaddr. */
 
-STATIC OP *(*a_old_ck_aslice)(pTHX_ OP *) = 0;
-STATIC OP *(*a_old_ck_hslice)(pTHX_ OP *) = 0;
+static OP *(*a_old_ck_aslice)(pTHX_ OP *) = 0;
+static OP *(*a_old_ck_hslice)(pTHX_ OP *) = 0;
 
-STATIC OP *a_ck_xslice(pTHX_ OP *o) {
+static OP *a_ck_xslice(pTHX_ OP *o) {
  OP * (*old_ck)(pTHX_ OP *o) = 0;
  UV hint = a_hint();
 
@@ -955,12 +955,12 @@ STATIC OP *a_ck_xslice(pTHX_ OP *o) {
 /* Those ops are only found at the root of a dereferencing expression. We can
  * then resolve at compile time if vivification must take place or not. */
 
-STATIC OP *(*a_old_ck_exists)(pTHX_ OP *) = 0;
-STATIC OP *(*a_old_ck_delete)(pTHX_ OP *) = 0;
-STATIC OP *(*a_old_ck_keys)  (pTHX_ OP *) = 0;
-STATIC OP *(*a_old_ck_values)(pTHX_ OP *) = 0;
+static OP *(*a_old_ck_exists)(pTHX_ OP *) = 0;
+static OP *(*a_old_ck_delete)(pTHX_ OP *) = 0;
+static OP *(*a_old_ck_keys)  (pTHX_ OP *) = 0;
+static OP *(*a_old_ck_values)(pTHX_ OP *) = 0;
 
-STATIC OP *a_ck_root(pTHX_ OP *o) {
+static OP *a_ck_root(pTHX_ OP *o) {
  OP * (*old_ck)(pTHX_ OP *o) = 0;
  OP * (*new_pp)(pTHX)        = 0;
  bool enabled = FALSE;
@@ -1006,11 +1006,11 @@ STATIC OP *a_ck_root(pTHX_ OP *o) {
 
 /* ... Our peephole optimizer .............................................. */
 
-STATIC peep_t a_old_peep = 0; /* This is actually the rpeep past 5.13.5 */
+static peep_t a_old_peep = 0; /* This is actually the rpeep past 5.13.5 */
 
-STATIC void a_peep_rec(pTHX_ OP *o, ptable *seen);
+static void a_peep_rec(pTHX_ OP *o, ptable *seen);
 
-STATIC void a_peep_rec(pTHX_ OP *o, ptable *seen) {
+static void a_peep_rec(pTHX_ OP *o, ptable *seen) {
 #define a_peep_rec(O) a_peep_rec(aTHX_ (O), seen)
  for (; o; o = o->op_next) {
   dA_MAP_THX;
@@ -1116,7 +1116,7 @@ STATIC void a_peep_rec(pTHX_ OP *o, ptable *seen) {
  }
 }
 
-STATIC void a_peep(pTHX_ OP *o) {
+static void a_peep(pTHX_ OP *o) {
  dMY_CXT;
  ptable *seen = MY_CXT.seen;
 
@@ -1131,9 +1131,9 @@ STATIC void a_peep(pTHX_ OP *o) {
 
 /* --- Interpreter setup/teardown ------------------------------------------ */
 
-STATIC U32 a_initialized = 0;
+static U32 a_initialized = 0;
 
-STATIC void a_teardown(pTHX_ void *root) {
+static void a_teardown(pTHX_ void *root) {
 
  if (!a_initialized)
   return;
@@ -1181,7 +1181,7 @@ STATIC void a_teardown(pTHX_ void *root) {
  a_initialized = 0;
 }
 
-STATIC void a_setup(pTHX) {
+static void a_setup(pTHX) {
 #define a_setup() a_setup(aTHX)
  if (a_initialized)
   return;
@@ -1230,7 +1230,7 @@ STATIC void a_setup(pTHX) {
  a_initialized = 1;
 }
 
-STATIC U32 a_booted = 0;
+static U32 a_booted = 0;
 
 /* --- XS ------------------------------------------------------------------ */
 
