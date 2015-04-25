@@ -29,6 +29,10 @@
 # define A_HAS_RPEEP A_HAS_PERL(5, 13, 5)
 #endif
 
+#ifndef A_HAS_MULTIDEREF
+# define A_HAS_MULTIDEREF A_HAS_PERL(5, 21, 7)
+#endif
+
 #ifndef OpSIBLING
 # ifdef OP_SIBLING
 #  define OpSIBLING(O) OP_SIBLING(O)
@@ -792,6 +796,273 @@ static OP *a_pp_root_binop(pTHX) {
  }
 }
 
+#if A_HAS_MULTIDEREF
+
+/* ... pp_multideref ....................................................... */
+
+static SV *a_do_fake_pp(pTHX_ OP *op) {
+#define a_do_fake_pp(O) a_do_fake_pp(aTHX_ (O))
+ {
+  OP *o = PL_op;
+  ENTER;
+  SAVEOP();
+  PL_op = op;
+  PL_op->op_ppaddr(aTHX);
+  PL_op = o;
+  LEAVE;
+ }
+
+ {
+  SV *ret;
+  dSP;
+  ret = POPs;
+  PUTBACK;
+  return ret;
+ }
+}
+
+static void a_do_fake_pp_unop_init(pTHX_ UNOP *unop, U32 type, U32 flags) {
+#define a_do_fake_pp_unop_init(O, T, F) a_do_fake_pp_unop_init(aTHX_ (O), (T), (F))
+ unop->op_type    = type;
+ unop->op_flags   = OPf_WANT_SCALAR | (~OPf_WANT & flags);
+ unop->op_private = 0;
+ unop->op_first   = NULL;
+ unop->op_ppaddr  = PL_ppaddr[type];
+}
+
+static SV *a_do_fake_pp_unop_arg1(pTHX_ U32 type, U32 flags, SV *arg) {
+#define a_do_fake_pp_unop_arg1(T, F, A) a_do_fake_pp_unop_arg1(aTHX_ (T), (F), (A))
+ UNOP unop;
+ dSP;
+
+ a_do_fake_pp_unop_init(&unop, type, flags);
+
+ EXTEND(SP, 1);
+ PUSHs(arg);
+ PUTBACK;
+
+ return a_do_fake_pp(&unop);
+}
+
+static SV *a_do_fake_pp_unop_arg2(pTHX_ U32 type, U32 flags, SV *arg1, SV *arg2) {
+#define a_do_fake_pp_unop_arg2(T, F, A1, A2) a_do_fake_pp_unop_arg2(aTHX_ (T), (F), (A1), (A2))
+ UNOP unop;
+ dSP;
+
+ a_do_fake_pp_unop_init(&unop, type, flags);
+
+ EXTEND(SP, 2);
+ PUSHs(arg1);
+ PUSHs(arg2);
+ PUTBACK;
+
+ return a_do_fake_pp(&unop);
+}
+
+#define a_do_pp_rv2av(R)      a_do_fake_pp_unop_arg1(OP_RV2AV,  OPf_REF, (R))
+#define a_do_pp_aexists(A, I) a_do_fake_pp_unop_arg2(OP_EXISTS, OPf_SPECIAL, (A), (I))
+#define a_do_pp_adelete(A, I) a_do_fake_pp_unop_arg2(OP_DELETE, OPf_SPECIAL, (A), (I))
+#define a_do_pp_aelem(A, I)   a_do_fake_pp_unop_arg2(OP_AELEM,  0,  (A), (I))
+
+#define a_do_pp_rv2hv(R)      a_do_fake_pp_unop_arg1(OP_RV2HV,  OPf_REF, (R))
+#define a_do_pp_hexists(H, K) a_do_fake_pp_unop_arg2(OP_EXISTS, 0,  (H), (K))
+#define a_do_pp_hdelete(H, K) a_do_fake_pp_unop_arg2(OP_DELETE, 0,  (H), (K))
+#define a_do_pp_helem(H, K)   a_do_fake_pp_unop_arg2(OP_HELEM,  0,  (H), (K))
+
+static OP *a_pp_multideref(pTHX) {
+ UNOP_AUX_item *items = cUNOP_AUXx(PL_op)->op_aux;
+ UV  actions = items->uv;
+ U8  isexdel = PL_op->op_private & (OPpMULTIDEREF_EXISTS|OPpMULTIDEREF_DELETE);
+ UV  flags   = 0;
+ SV *sv      = NULL;
+ dSP;
+
+ {
+  dA_MAP_THX;
+  const a_op_info *oi = a_map_fetch(PL_op);
+  flags = oi->flags;
+  if (isexdel) {
+   if (isexdel & OPpMULTIDEREF_EXISTS) {
+    if (flags & A_HINT_EXISTS)
+     goto hijack;
+   } else if (flags & A_HINT_DELETE) {
+    assert(isexdel & OPpMULTIDEREF_DELETE);
+    goto hijack;
+   }
+  } else if (flags & A_HINT_FETCH) {
+   goto hijack;
+  }
+  return oi->old_pp(aTHX);
+ }
+
+hijack:
+ PL_multideref_pc = items;
+
+ while (1) {
+  switch (actions & MDEREF_ACTION_MASK) {
+   case MDEREF_reload:
+    actions = (++items)->uv;
+    continue;
+   case MDEREF_AV_padav_aelem: /* $lex[...] */
+    sv = PAD_SVl((++items)->pad_offset);
+    if (a_undef(sv))
+     goto ret_undef;
+    goto do_AV_aelem;
+   case MDEREF_AV_gvav_aelem: /* $pkg[...] */
+    sv = UNOP_AUX_item_sv(++items);
+    assert(isGV_with_GP(sv));
+    sv = (SV *) GvAVn((GV *) sv);
+    if (a_undef(sv))
+     goto ret_undef;
+    goto do_AV_aelem;
+   case MDEREF_AV_pop_rv2av_aelem: /* expr->[...] */
+    sv = POPs;
+    if (a_undef(sv))
+     goto ret_undef;
+    goto do_AV_rv2av_aelem;
+   case MDEREF_AV_gvsv_vivify_rv2av_aelem: /* $pkg->[...] */
+    sv = UNOP_AUX_item_sv(++items);
+    assert(isGV_with_GP(sv));
+    sv = GvSVn((GV *) sv);
+    if (a_undef(sv))
+     goto ret_undef;
+    goto do_AV_vivify_rv2av_aelem;
+   case MDEREF_AV_padsv_vivify_rv2av_aelem: /* $lex->[...] */
+    sv = PAD_SVl((++items)->pad_offset);
+    if (a_undef(sv))
+     goto ret_undef;
+    /* FALLTHROUGH */
+   case MDEREF_AV_vivify_rv2av_aelem: /* vivify, ->[...] */
+do_AV_vivify_rv2av_aelem:
+    sv = Perl_vivify_ref(aTHX_ sv, OPpDEREF_AV);
+do_AV_rv2av_aelem:
+    sv = a_do_pp_rv2av(sv);
+do_AV_aelem:
+    {
+     SV *esv;
+     assert(SvTYPE(sv) == SVt_PVAV);
+     switch (actions & MDEREF_INDEX_MASK) {
+      case MDEREF_INDEX_none:
+       goto finish;
+      case MDEREF_INDEX_const:
+       esv = sv_2mortal(newSViv((++items)->iv));
+       break;
+      case MDEREF_INDEX_padsv:
+       esv = PAD_SVl((++items)->pad_offset);
+       goto check_elem;
+      case MDEREF_INDEX_gvsv:
+       esv = UNOP_AUX_item_sv(++items);
+       assert(isGV_with_GP(esv));
+       esv = GvSVn((GV *) esv);
+check_elem:
+       if (UNLIKELY(SvROK(esv) && !SvGAMAGIC(esv) && ckWARN(WARN_MISC)))
+        Perl_warner(aTHX_ packWARN(WARN_MISC),
+                          "Use of reference \"%"SVf"\" as array index",
+                          SVfARG(esv));
+       break;
+     }
+     PL_multideref_pc = items;
+     if (actions & MDEREF_FLAG_last) {
+      if (isexdel) {
+       if (isexdel & OPpMULTIDEREF_EXISTS)
+        sv = a_do_pp_aexists(sv, esv);
+       else
+        sv = a_do_pp_adelete(sv, esv);
+      } else {
+       sv = a_do_pp_aelem(sv, esv);
+      }
+      goto finish;
+     } else {
+      sv = a_do_pp_aelem(sv, esv);
+     }
+    }
+   case MDEREF_HV_padhv_helem: /* $lex{...} */
+    sv = PAD_SVl((++items)->pad_offset);
+    if (a_undef(sv))
+     goto ret_undef;
+    goto do_HV_helem;
+   case MDEREF_HV_gvhv_helem: /* $pkg{...} */
+    sv = UNOP_AUX_item_sv(++items);
+    assert(isGV_with_GP(sv));
+    sv = (SV *) GvHVn((GV *) sv);
+    if (a_undef(sv))
+     goto ret_undef;
+    goto do_HV_helem;
+   case MDEREF_HV_pop_rv2hv_helem: /* expr->{...} */
+    sv = POPs;
+    if (a_undef(sv))
+     goto ret_undef;
+    goto do_HV_rv2hv_helem;
+   case MDEREF_HV_gvsv_vivify_rv2hv_helem: /* $pkg->{...} */
+    sv = UNOP_AUX_item_sv(++items);
+    assert(isGV_with_GP(sv));
+    sv = GvSVn((GV *) sv);
+    if (a_undef(sv))
+     goto ret_undef;
+    goto do_HV_vivify_rv2hv_helem;
+   case MDEREF_HV_padsv_vivify_rv2hv_helem: /* $lex->{...} */
+    sv = PAD_SVl((++items)->pad_offset);
+    if (a_undef(sv))
+     goto ret_undef;
+    /* FALLTHROUGH */
+   case MDEREF_HV_vivify_rv2hv_helem: /* vivify, ->{...} */
+do_HV_vivify_rv2hv_helem:
+    sv = Perl_vivify_ref(aTHX_ sv, OPpDEREF_HV);
+do_HV_rv2hv_helem:
+    sv = a_do_pp_rv2hv(sv);
+do_HV_helem:
+    {
+     SV *key;
+     assert(SvTYPE(sv) == SVt_PVHV);
+     switch (actions & MDEREF_INDEX_MASK) {
+      case MDEREF_INDEX_none:
+       goto finish;
+      case MDEREF_INDEX_const:
+       key = UNOP_AUX_item_sv(++items);
+       break;
+      case MDEREF_INDEX_padsv:
+       key = PAD_SVl((++items)->pad_offset);
+       break;
+      case MDEREF_INDEX_gvsv:
+       key = UNOP_AUX_item_sv(++items);
+       assert(isGV_with_GP(key));
+       key = GvSVn((GV *) key);
+       break;
+     }
+     PL_multideref_pc = items;
+     if (actions & MDEREF_FLAG_last) {
+      if (isexdel) {
+       if (isexdel & OPpMULTIDEREF_EXISTS)
+        sv = a_do_pp_hexists(sv, key);
+       else
+        sv = a_do_pp_hdelete(sv, key);
+      } else {
+       sv = a_do_pp_helem(sv, key);
+      }
+      goto finish;
+     } else {
+      sv = a_do_pp_helem(sv, key);
+     }
+    }
+  }
+
+  actions >>= MDEREF_SHIFT;
+ }
+
+ret_undef:
+ if (flags & (A_HINT_NOTIFY|A_HINT_STORE))
+  a_cannot_vivify(flags);
+ if (isexdel & OPpMULTIDEREF_EXISTS)
+  sv = &PL_sv_no;
+ else
+  sv = &PL_sv_undef;
+finish:
+ XPUSHs(sv);
+ RETURN;
+}
+
+#endif /* A_HAS_MULTIDEREF */
+
 /* --- Check functions ----------------------------------------------------- */
 
 static void a_recheck_rv2xv(pTHX_ OP *o, OPCODE type, OP *(*new_pp)(pTHX)) {
@@ -883,6 +1154,13 @@ static OP *a_ck_deref(pTHX_ OP *o) {
  o = old_ck(aTHX_ o);
 
  if (hint & A_HINT_DO) {
+#if A_HAS_MULTIDEREF
+  if (old_ck == a_old_ck_rv2sv && o->op_flags & OPf_KIDS) {
+   OP *kid = cUNOPo->op_first;
+   if (kid && kid->op_type == OP_GV)
+    a_map_store(kid, kid->op_ppaddr, NULL, hint);
+  }
+#endif
   a_map_store_root(o, o->op_ppaddr, hint);
   o->op_ppaddr = a_pp_deref;
  } else
@@ -1085,6 +1363,24 @@ static void a_peep_rec(pTHX_ OP *o, ptable *seen) {
     if (!(oi->flags & A_HINT_DEREF))
      o->op_ppaddr  = oi->old_pp;
     break;
+#if A_HAS_MULTIDEREF
+   case OP_MULTIDEREF:
+    if (o->op_ppaddr != a_pp_multideref) {
+     UV isexdel;
+     oi = a_map_fetch(cUNOPo->op_first);
+     if (!oi)
+      break;
+     flags   = oi->flags;
+     isexdel = o->op_private & (OPpMULTIDEREF_EXISTS|OPpMULTIDEREF_DELETE);
+     if (  ((flags & A_HINT_FETCH)  && !isexdel)
+         || (flags & A_HINT_EXISTS) && (isexdel & OPpMULTIDEREF_EXISTS)
+         || (flags & A_HINT_DELETE) && (isexdel & OPpMULTIDEREF_DELETE)) {
+      a_map_store(o, o->op_ppaddr, oi->next, oi->flags);
+      o->op_ppaddr = a_pp_multideref;
+     }
+    }
+    break;
+#endif
 #if !A_HAS_RPEEP
    case OP_MAPWHILE:
    case OP_GREPWHILE:
