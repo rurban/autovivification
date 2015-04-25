@@ -710,6 +710,16 @@ static OP *a_pp_rv2hv(pTHX) {
 
 /* ... pp_deref (aelem,helem,rv2sv,padsv) .................................. */
 
+static void a_cannot_vivify(pTHX_ UV flags) {
+#define a_cannot_vivify(F) a_cannot_vivify(aTHX_ (F))
+ if (flags & A_HINT_STRICT)
+  croak("Reference vivification forbidden");
+ else if (flags & A_HINT_WARN)
+  warn("Reference was vivified");
+ else /* A_HINT_STORE */
+  croak("Can't vivify reference");
+}
+
 static OP *a_pp_deref(pTHX) {
  dA_MAP_THX;
  const a_op_info *oi;
@@ -726,14 +736,8 @@ static OP *a_pp_deref(pTHX) {
 
   if (flags & (A_HINT_NOTIFY|A_HINT_STORE)) {
    SPAGAIN;
-   if (a_undef(TOPs)) {
-    if (flags & A_HINT_STRICT)
-     croak("Reference vivification forbidden");
-    else if (flags & A_HINT_WARN)
-      warn("Reference was vivified");
-    else /* A_HINT_STORE */
-     croak("Can't vivify reference");
-   }
+   if (a_undef(TOPs))
+    a_cannot_vivify(flags);
   }
 
   return o;
