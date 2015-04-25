@@ -49,10 +49,15 @@
 #endif
 
 #ifndef A_MULTIPLICITY
-# if defined(MULTIPLICITY) || defined(PERL_IMPLICIT_CONTEXT)
+# if defined(MULTIPLICITY)
 #  define A_MULTIPLICITY 1
 # else
 #  define A_MULTIPLICITY 0
+# endif
+#endif
+#if A_MULTIPLICITY
+# ifndef PERL_IMPLICIT_CONTEXT
+#  error MULTIPLICITY builds must set PERL_IMPLICIT_CONTEXT
 # endif
 #endif
 
