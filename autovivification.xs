@@ -972,9 +972,9 @@ check_elem:
        sv = a_do_pp_aelem(sv, esv);
       }
       goto finish;
-     } else {
-      sv = a_do_pp_aelem(sv, esv);
      }
+     sv = a_do_pp_aelem(sv, esv);
+     break;
     }
    case MDEREF_HV_padhv_helem: /* $lex{...} */
     sv = PAD_SVl((++items)->pad_offset);
@@ -1040,9 +1040,9 @@ do_HV_helem:
        sv = a_do_pp_helem(sv, key);
       }
       goto finish;
-     } else {
-      sv = a_do_pp_helem(sv, key);
      }
+     sv = a_do_pp_helem(sv, key);
+     break;
     }
   }
 
