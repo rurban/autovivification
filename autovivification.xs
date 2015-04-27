@@ -929,10 +929,10 @@ hijack:
     goto do_AV_vivify_rv2av_aelem;
    case MDEREF_AV_padsv_vivify_rv2av_aelem: /* $lex->[...] */
     sv = PAD_SVl((++items)->pad_offset);
-    if (a_undef(sv))
-     goto ret_undef;
     /* FALLTHROUGH */
    case MDEREF_AV_vivify_rv2av_aelem: /* vivify, ->[...] */
+    if (a_undef(sv))
+     goto ret_undef;
 do_AV_vivify_rv2av_aelem:
     sv = Perl_vivify_ref(aTHX_ sv, OPpDEREF_AV);
 do_AV_rv2av_aelem:
@@ -1002,10 +1002,10 @@ check_elem:
     goto do_HV_vivify_rv2hv_helem;
    case MDEREF_HV_padsv_vivify_rv2hv_helem: /* $lex->{...} */
     sv = PAD_SVl((++items)->pad_offset);
-    if (a_undef(sv))
-     goto ret_undef;
     /* FALLTHROUGH */
    case MDEREF_HV_vivify_rv2hv_helem: /* vivify, ->{...} */
+    if (a_undef(sv))
+     goto ret_undef;
 do_HV_vivify_rv2hv_helem:
     sv = Perl_vivify_ref(aTHX_ sv, OPpDEREF_HV);
 do_HV_rv2hv_helem:
