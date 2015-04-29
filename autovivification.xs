@@ -800,6 +800,34 @@ static OP *a_pp_root_binop(pTHX) {
 
 /* ... pp_multideref ....................................................... */
 
+static UV a_do_multideref(const OP *o, UV flags) {
+ UV isexdel;
+
+ assert(o->op_type == OP_MULTIDEREF);
+
+ isexdel = o->op_private & (OPpMULTIDEREF_EXISTS|OPpMULTIDEREF_DELETE);
+
+ if (isexdel) {
+  if (isexdel & OPpMULTIDEREF_EXISTS) {
+   if (flags & A_HINT_EXISTS)
+    return A_HINT_EXISTS;
+  } else {
+   if (flags & A_HINT_DELETE)
+    return A_HINT_DELETE;
+  }
+ } else {
+  if (o->op_flags & OPf_MOD) {
+   if (flags & A_HINT_STORE)
+    return A_HINT_STORE;
+  } else {
+   if (flags & A_HINT_FETCH)
+    return A_HINT_FETCH;
+  }
+ }
+
+ return 0;
+}
+
 static SV *a_do_fake_pp(pTHX_ OP *op) {
 #define a_do_fake_pp(O) a_do_fake_pp(aTHX_ (O))
  {
@@ -859,43 +887,39 @@ static SV *a_do_fake_pp_unop_arg2(pTHX_ U32 type, U32 flags, SV *arg1, SV *arg2)
  return a_do_fake_pp(&unop);
 }
 
-#define a_do_pp_rv2av(R)      a_do_fake_pp_unop_arg1(OP_RV2AV,  OPf_REF, (R))
-#define a_do_pp_aexists(A, I) a_do_fake_pp_unop_arg2(OP_EXISTS, OPf_SPECIAL, (A), (I))
-#define a_do_pp_adelete(A, I) a_do_fake_pp_unop_arg2(OP_DELETE, OPf_SPECIAL, (A), (I))
-#define a_do_pp_aelem(A, I)   a_do_fake_pp_unop_arg2(OP_AELEM,  0,  (A), (I))
+#define a_do_pp_rv2av(R)        a_do_fake_pp_unop_arg1(OP_RV2AV,  OPf_REF,     (R))
+#define a_do_pp_afetch(A, I)    a_do_fake_pp_unop_arg2(OP_AELEM,  0,           (A), (I))
+#define a_do_pp_afetch_lv(A, I) a_do_fake_pp_unop_arg2(OP_AELEM,  OPf_MOD,     (A), (I))
+#define a_do_pp_aexists(A, I)   a_do_fake_pp_unop_arg2(OP_EXISTS, OPf_SPECIAL, (A), (I))
+#define a_do_pp_adelete(A, I)   a_do_fake_pp_unop_arg2(OP_DELETE, OPf_SPECIAL, (A), (I))
 
-#define a_do_pp_rv2hv(R)      a_do_fake_pp_unop_arg1(OP_RV2HV,  OPf_REF, (R))
-#define a_do_pp_hexists(H, K) a_do_fake_pp_unop_arg2(OP_EXISTS, 0,  (H), (K))
-#define a_do_pp_hdelete(H, K) a_do_fake_pp_unop_arg2(OP_DELETE, 0,  (H), (K))
-#define a_do_pp_helem(H, K)   a_do_fake_pp_unop_arg2(OP_HELEM,  0,  (H), (K))
+#define a_do_pp_rv2hv(R)        a_do_fake_pp_unop_arg1(OP_RV2HV,  OPf_REF, (R))
+#define a_do_pp_hfetch(H, K)    a_do_fake_pp_unop_arg2(OP_HELEM,  0,       (H), (K))
+#define a_do_pp_hfetch_lv(H, K) a_do_fake_pp_unop_arg2(OP_HELEM,  OPf_MOD, (H), (K))
+#define a_do_pp_hexists(H, K)   a_do_fake_pp_unop_arg2(OP_EXISTS, 0,  (H), (K))
+#define a_do_pp_hdelete(H, K)   a_do_fake_pp_unop_arg2(OP_DELETE, 0,  (H), (K))
 
 static OP *a_pp_multideref(pTHX) {
- UNOP_AUX_item *items = cUNOP_AUXx(PL_op)->op_aux;
- UV  actions = items->uv;
- U8  isexdel = PL_op->op_private & (OPpMULTIDEREF_EXISTS|OPpMULTIDEREF_DELETE);
- UV  flags   = 0;
- SV *sv      = NULL;
+ UNOP_AUX_item *items;
+ UV  actions;
+ UV  flags = 0;
+ UV  deref = 0;
+ SV *sv    = NULL;
  dSP;
 
  {
   dA_MAP_THX;
   const a_op_info *oi = a_map_fetch(PL_op);
+  assert(oi);
   flags = oi->flags;
-  if (isexdel) {
-   if (isexdel & OPpMULTIDEREF_EXISTS) {
-    if (flags & A_HINT_EXISTS)
-     goto hijack;
-   } else if (flags & A_HINT_DELETE) {
-    assert(isexdel & OPpMULTIDEREF_DELETE);
-    goto hijack;
-   }
-  } else if (flags & A_HINT_FETCH) {
-   goto hijack;
-  }
-  return oi->old_pp(aTHX);
+  deref = a_do_multideref(PL_op, flags);
+  if (!deref)
+   return oi->old_pp(aTHX);
  }
 
-hijack:
+ items   = cUNOP_AUXx(PL_op)->op_aux;
+ actions = items->uv;
+
  PL_multideref_pc = items;
 
  while (1) {
@@ -963,17 +987,23 @@ check_elem:
      }
      PL_multideref_pc = items;
      if (actions & MDEREF_FLAG_last) {
-      if (isexdel) {
-       if (isexdel & OPpMULTIDEREF_EXISTS)
+      switch (deref) {
+       case A_HINT_FETCH:
+        sv = a_do_pp_afetch(sv, esv);
+        break;
+       case A_HINT_STORE:
+        sv = a_do_pp_afetch_lv(sv, esv);
+        break;
+       case A_HINT_EXISTS:
         sv = a_do_pp_aexists(sv, esv);
-       else
+        break;
+       case A_HINT_DELETE:
         sv = a_do_pp_adelete(sv, esv);
-      } else {
-       sv = a_do_pp_aelem(sv, esv);
+        break;
       }
       goto finish;
      }
-     sv = a_do_pp_aelem(sv, esv);
+     sv = a_do_pp_afetch(sv, esv);
      break;
     }
    case MDEREF_HV_padhv_helem: /* $lex{...} */
@@ -1031,17 +1061,25 @@ do_HV_helem:
      }
      PL_multideref_pc = items;
      if (actions & MDEREF_FLAG_last) {
-      if (isexdel) {
-       if (isexdel & OPpMULTIDEREF_EXISTS)
+      switch (deref) {
+       case A_HINT_FETCH:
+        sv = a_do_pp_hfetch(sv, key);
+        break;
+       case A_HINT_STORE:
+        sv = a_do_pp_hfetch_lv(sv, key);
+	break;
+       case A_HINT_EXISTS:
         sv = a_do_pp_hexists(sv, key);
-       else
+        break;
+       case A_HINT_DELETE:
         sv = a_do_pp_hdelete(sv, key);
-      } else {
-       sv = a_do_pp_helem(sv, key);
+        break;
+       default:
+        break;
       }
       goto finish;
      }
-     sv = a_do_pp_helem(sv, key);
+     sv = a_do_pp_hfetch(sv, key);
      break;
     }
   }
@@ -1050,9 +1088,9 @@ do_HV_helem:
  }
 
 ret_undef:
- if (flags & (A_HINT_NOTIFY|A_HINT_STORE))
+ if ((flags & A_HINT_NOTIFY) || (deref == A_HINT_STORE))
   a_cannot_vivify(flags);
- if (isexdel & OPpMULTIDEREF_EXISTS)
+ if (deref == A_HINT_EXISTS)
   sv = &PL_sv_no;
  else
   sv = &PL_sv_undef;
@@ -1366,16 +1404,12 @@ static void a_peep_rec(pTHX_ OP *o, ptable *seen) {
 #if A_HAS_MULTIDEREF
    case OP_MULTIDEREF:
     if (o->op_ppaddr != a_pp_multideref) {
-     UV isexdel;
      oi = a_map_fetch(cUNOPo->op_first);
      if (!oi)
       break;
-     flags   = oi->flags;
-     isexdel = o->op_private & (OPpMULTIDEREF_EXISTS|OPpMULTIDEREF_DELETE);
-     if (  ((flags & A_HINT_FETCH)  && !isexdel)
-         || (flags & A_HINT_EXISTS) && (isexdel & OPpMULTIDEREF_EXISTS)
-         || (flags & A_HINT_DELETE) && (isexdel & OPpMULTIDEREF_DELETE)) {
-      a_map_store(o, o->op_ppaddr, oi->next, oi->flags);
+     flags = oi->flags;
+     if (a_do_multideref(o, flags)) {
+      a_map_store_root(o, o->op_ppaddr, flags & ~A_HINT_DEREF);
       o->op_ppaddr = a_pp_multideref;
      }
     }
