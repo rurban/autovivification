@@ -4,14 +4,17 @@ use strict;
 use warnings;
 
 use lib 't/lib';
-use Test::Leaner tests => 3 * 4 * (8 ** 3) * 2;
+use Test::Leaner tests => 4 * 4 * (8 ** 3) * 2;
 
 my $depth = 3;
 
+my $magic_val = 123;
+
 my @prefixes = (
- '',
- 'exists ',
- 'delete ',
+ sub { $_[0]                },
+ sub { "$_[0] = $magic_val" },
+ sub { "exists $_[0]"       },
+ sub { "delete $_[0]"       },
 );
 
 my  (@vlex, %vlex, $vrlex);
@@ -87,11 +90,14 @@ sub reset_vars {
  }
 }
 
-my $iterator = autovivification::TestIterator->new(3, 4, (8) x $depth);
+my $iterator = autovivification::TestIterator->new(4, 4, (8) x $depth);
 do {
- my @elems = $iterator->pick(\@prefixes, \@heads, (\@derefs) x $depth);
- my $code  = join '', @elems;
- my $exp   = $elems[0] eq 'exists ' ? !1 : undef;
+ my ($prefix, @elems)
+                    = $iterator->pick(\@prefixes, \@heads, (\@derefs) x $depth);
+ my $code = $prefix->(join '', @elems);
+ my $exp  = ($code =~ /^\s*exists/) ? !1
+                                    : (($code =~ /=\s*$magic_val/) ? $magic_val
+                                                                   : undef);
  reset_vars();
  my ($res, $err) = do {
   local $SIG{__WARN__} = sub { die @_ };
