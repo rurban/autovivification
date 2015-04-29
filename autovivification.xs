@@ -869,7 +869,7 @@ static SV *a_do_fake_pp_unop_arg1(pTHX_ U32 type, U32 flags, SV *arg) {
  PUSHs(arg);
  PUTBACK;
 
- return a_do_fake_pp(&unop);
+ return a_do_fake_pp((OP *) &unop);
 }
 
 static SV *a_do_fake_pp_unop_arg2(pTHX_ U32 type, U32 flags, SV *arg1, SV *arg2) {
@@ -884,7 +884,7 @@ static SV *a_do_fake_pp_unop_arg2(pTHX_ U32 type, U32 flags, SV *arg1, SV *arg2)
  PUSHs(arg2);
  PUTBACK;
 
- return a_do_fake_pp(&unop);
+ return a_do_fake_pp((OP *) &unop);
 }
 
 #define a_do_pp_rv2av(R)        a_do_fake_pp_unop_arg1(OP_RV2AV,  OPf_REF,     (R))
