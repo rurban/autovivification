@@ -54,11 +54,30 @@ sub reset_vars {
  sub new {
   my $class = shift;
 
+  my (@lists, @max);
+  for my $arg (@_) {
+   next unless defined $arg;
+   my $type = ref $arg;
+   my $list;
+   if ($type eq 'ARRAY') {
+    $list = $arg;
+   } elsif ($type eq '') {
+    $list = [ 1 .. $arg ];
+   } else {
+    die "Invalid argument of type $type";
+   }
+   my $max = @$list;
+   die "Empty list" unless $max;
+   push @lists, $list;
+   push @max,   $max;
+  }
+
   my $len = @_;
   bless {
-   len => $len,
-   max => \@_,
-   idx => [ (0) x $len ],
+   len   => $len,
+   max   => \@max,
+   lists => \@lists,
+   idx   => [ (0) x $len ],
   }, $class;
  }
 
@@ -81,19 +100,20 @@ sub reset_vars {
   return $i < $len;
  }
 
- sub pick {
+ sub items {
   my $self = shift;
 
-  my ($len, $idx) = @$self{qw<len idx>};
+  my ($len, $lists, $idx) = @$self{qw<len lists idx>};
 
-  return map $_[$_]->[$idx->[$_]], 0 .. ($len - 1);
+  return map $lists->[$_]->[$idx->[$_]], 0 .. ($len - 1);
  }
 }
 
-my $iterator = autovivification::TestIterator->new(4, 4, (8) x $depth);
+my $iterator = autovivification::TestIterator->new(
+ \@prefixes, \@heads, (\@derefs) x $depth,
+);
 do {
- my ($prefix, @elems)
-                    = $iterator->pick(\@prefixes, \@heads, (\@derefs) x $depth);
+ my ($prefix, @elems) = $iterator->items;
  my $code = $prefix->(join '', @elems);
  my $exp  = ($code =~ /^\s*exists/) ? !1
                                     : (($code =~ /=\s*$magic_val/) ? $magic_val
