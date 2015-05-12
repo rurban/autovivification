@@ -93,11 +93,11 @@
 #endif
 
 #if defined(OP_CHECK_MUTEX_LOCK) && defined(OP_CHECK_MUTEX_UNLOCK)
-# define A_CHECK_MUTEX_LOCK   OP_CHECK_MUTEX_LOCK
-# define A_CHECK_MUTEX_UNLOCK OP_CHECK_MUTEX_UNLOCK
+# define A_CHECK_LOCK   OP_CHECK_MUTEX_LOCK
+# define A_CHECK_UNLOCK OP_CHECK_MUTEX_UNLOCK
 #else
-# define A_CHECK_MUTEX_LOCK   OP_REFCNT_LOCK
-# define A_CHECK_MUTEX_UNLOCK OP_REFCNT_UNLOCK
+# define A_CHECK_LOCK   OP_REFCNT_LOCK
+# define A_CHECK_UNLOCK OP_REFCNT_UNLOCK
 #endif
 
 typedef OP *(*a_ck_t)(pTHX_ OP *);
@@ -110,24 +110,24 @@ typedef OP *(*a_ck_t)(pTHX_ OP *);
 
 static void a_ck_replace(pTHX_ OPCODE type, a_ck_t new_ck, a_ck_t *old_ck_p) {
 #define a_ck_replace(T, NC, OCP) a_ck_replace(aTHX_ (T), (NC), (OCP))
- A_CHECK_MUTEX_LOCK;
+ A_CHECK_LOCK;
  if (!*old_ck_p) {
   *old_ck_p      = PL_check[type];
   PL_check[type] = new_ck;
  }
- A_CHECK_MUTEX_UNLOCK;
+ A_CHECK_UNLOCK;
 }
 
 #endif
 
 static void a_ck_restore(pTHX_ OPCODE type, a_ck_t *old_ck_p) {
 #define a_ck_restore(T, OCP) a_ck_restore(aTHX_ (T), (OCP))
- A_CHECK_MUTEX_LOCK;
+ A_CHECK_LOCK;
  if (*old_ck_p) {
   PL_check[type] = *old_ck_p;
   *old_ck_p      = 0;
  }
- A_CHECK_MUTEX_UNLOCK;
+ A_CHECK_UNLOCK;
 }
 
 /* --- Helpers ------------------------------------------------------------- */
