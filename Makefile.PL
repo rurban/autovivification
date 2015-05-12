@@ -65,6 +65,7 @@ my %BUILD_REQUIRES = (
  'Config'              => 0,
  'Exporter'            => 0,
  'ExtUtils::MakeMaker' => 0,
+ 'POSIX'               => 0,
  'Test::More'          => 0,
  %PREREQ_PM,
 );

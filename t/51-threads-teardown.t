@@ -4,8 +4,10 @@ use strict;
 use warnings;
 
 use lib 't/lib';
-use VPIT::TestHelpers;
-use autovivification::TestThreads;
+use VPIT::TestHelpers (
+ threads => [ 'autovivification' => 'autovivification::A_THREADSAFE()' ],
+ 'run_perl',
+);
 
 use Test::Leaner tests => 2;
 
@@ -25,10 +27,12 @@ SKIP:
            ? 0 : 4;
   exit $code;
  RUN
- is $status, 0, 'loading the pragma in a thread and using it outside doesn\'t segfault';
+ skip RUN_PERL_FAILED() => 1 unless defined $status;
+ is $status, 0,
+        'loading the pragma in a thread and using it outside doesn\'t segfault';
 }
 
-{
+SKIP: {
  my $status = run_perl <<' RUN';
   use threads;
   BEGIN { require autovivification; }
@@ -43,5 +47,6 @@ SKIP:
   })->join;
   exit $code;
  RUN
+ skip RUN_PERL_FAILED() => 1 unless defined $status;
  is $status, 0, 'autovivification can be loaded in eval STRING during global destruction at the end of a thread';
 }

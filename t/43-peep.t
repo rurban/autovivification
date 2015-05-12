@@ -6,7 +6,7 @@ use warnings;
 use Test::More;
 
 use lib 't/lib';
-use VPIT::TestHelpers;
+use VPIT::TestHelpers 'run_perl';
 
 plan tests => 11 + 5 * 2 + 5 * 3;
 
@@ -159,10 +159,13 @@ plan tests => 11 + 5 * 2 + 5 * 3;
  for my $desc (keys %infinite_tests) {
   my $code = $infinite_tests{$desc};
   my $ret  = run_perl $code;
-  my $stat = $ret & 255;
-  $ret   >>= 8;
-  is $stat, 0, "$desc testcase did not crash";
-  is $ret,  1, "$desc compiled fine";
+  SKIP: {
+   skip RUN_PERL_FAILED() => 2 unless defined $ret;
+   my $stat = $ret & 255;
+   $ret   >>= 8;
+   is $stat, 0, "$desc testcase did not crash";
+   is $ret,  1, "$desc compiled fine";
+  }
  }
 }
 

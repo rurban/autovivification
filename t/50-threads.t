@@ -1,10 +1,12 @@
-#!perl -T
+#!perl
 
 use strict;
 use warnings;
 
 use lib 't/lib';
-use autovivification::TestThreads;
+use VPIT::TestHelpers (
+ threads => [ 'autovivification' => 'autovivification::A_THREADSAFE()' ],
+);
 
 use Test::Leaner;
 
