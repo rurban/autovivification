@@ -801,31 +801,28 @@ static OP *a_pp_root_binop(pTHX) {
 /* ... pp_multideref ....................................................... */
 
 static UV a_do_multideref(const OP *o, UV flags) {
- UV isexdel;
+ UV isexdel, other_flags;
 
  assert(o->op_type == OP_MULTIDEREF);
 
- isexdel = o->op_private & (OPpMULTIDEREF_EXISTS|OPpMULTIDEREF_DELETE);
+ other_flags = flags & ~A_HINT_DO;
 
+ isexdel = o->op_private & (OPpMULTIDEREF_EXISTS|OPpMULTIDEREF_DELETE);
  if (isexdel) {
   if (isexdel & OPpMULTIDEREF_EXISTS) {
-   if (flags & A_HINT_EXISTS)
-    return A_HINT_EXISTS;
+   flags &= A_HINT_EXISTS;
   } else {
-   if (flags & A_HINT_DELETE)
-    return A_HINT_DELETE;
+   flags &= A_HINT_DELETE;
   }
  } else {
   if (o->op_flags & OPf_MOD) {
-   if (flags & A_HINT_STORE)
-    return A_HINT_STORE;
+   flags &= A_HINT_STORE;
   } else {
-   if (flags & A_HINT_FETCH)
-    return A_HINT_FETCH;
+   flags &= A_HINT_FETCH;
   }
  }
 
- return 0;
+ return flags ? (flags | other_flags) : 0;
 }
 
 static SV *a_do_fake_pp(pTHX_ OP *op) {
@@ -903,7 +900,6 @@ static OP *a_pp_multideref(pTHX) {
  UNOP_AUX_item *items;
  UV  actions;
  UV  flags = 0;
- UV  deref = 0;
  SV *sv    = NULL;
  dSP;
 
@@ -911,9 +907,8 @@ static OP *a_pp_multideref(pTHX) {
   dA_MAP_THX;
   const a_op_info *oi = a_map_fetch(PL_op);
   assert(oi);
-  flags = oi->flags;
-  deref = a_do_multideref(PL_op, flags);
-  if (!deref)
+  flags = a_do_multideref(PL_op, oi->flags);
+  if (!flags)
    return oi->old_pp(aTHX);
  }
 
@@ -987,7 +982,7 @@ check_elem:
      }
      PL_multideref_pc = items;
      if (actions & MDEREF_FLAG_last) {
-      switch (deref) {
+      switch (flags & A_HINT_DO) {
        case A_HINT_FETCH:
         sv = a_do_pp_afetch(sv, esv);
         break;
@@ -1061,7 +1056,7 @@ do_HV_helem:
      }
      PL_multideref_pc = items;
      if (actions & MDEREF_FLAG_last) {
-      switch (deref) {
+      switch (flags & A_HINT_DO) {
        case A_HINT_FETCH:
         sv = a_do_pp_hfetch(sv, key);
         break;
@@ -1088,9 +1083,9 @@ do_HV_helem:
  }
 
 ret_undef:
- if ((flags & A_HINT_NOTIFY) || (deref == A_HINT_STORE))
+ if (flags & (A_HINT_NOTIFY|A_HINT_STORE))
   a_cannot_vivify(flags);
- if (deref == A_HINT_EXISTS)
+ if (flags & A_HINT_EXISTS)
   sv = &PL_sv_no;
  else
   sv = &PL_sv_undef;
