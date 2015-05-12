@@ -800,6 +800,15 @@ static OP *a_pp_root_binop(pTHX) {
 
 /* ... pp_multideref ....................................................... */
 
+/* This pp replacement is actually only called for topmost exists/delete ops,
+ * because we hijack the [ah]elem check functions and this disables the
+ * optimization for lvalue and rvalue dereferencing. In particular, the
+ * OPf_MOD branches should never be covered. In the future, the multideref
+ * optimization might also be disabled for custom exists/delete check functions,
+ * which will make this section unnecessary. However, the code tries to be as
+ * general as possible in case I think of a way to reenable the multideref
+ * optimization even when this module is in use. */
+
 static UV a_do_multideref(const OP *o, UV flags) {
  UV isexdel, other_flags;
 
