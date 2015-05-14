@@ -1,5 +1,24 @@
 Revision history for autovivification
 
+0.15    2015-05-14 20:35 UTC
+        + Chg : The new environment variable to enable thread tests on older
+                perls is PERL_FORCE_TEST_THREADS. Note that this variable
+                should only be turned on by authors.
+        + Fix : The module has been taught about the new multideref
+                optimization, and will function properly on perl 5.21.11 and
+                above.
+        + Fix : The module will no longer crash or behave erratically when it
+                is loaded by several threads (or Windows emulated processes)
+                ran in parallel.
+        + Fix : Update the Windows ActivePerl + gcc 3.4 workaround for
+                ExtUtils::MakeMaker 7.04. Thanks Christian Walde for reporting
+                and feedback on this issue.
+        + Fix : Be really compatible with the optional OP_PARENT feature.
+        + Tst : $ENV{$Config{ldlibpthname}} is now preserved on all platforms,
+                which will address failures of t/43-peep.t and
+                t/51-threads-teardown.t with unusual compilers (like icc) that
+                link all their compiled objects to their own libraries.
+
 0.14    2014-11-01 22:25 UTC
         + Fix : [RT #99458] : AnyEvent::Loop hangs if autovivification 0.13 is
                 loaded

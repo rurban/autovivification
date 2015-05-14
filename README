@@ -2,7 +2,7 @@ NAME
     autovivification - Lexically disable autovivification.
 
 VERSION
-    Version 0.14
+    Version 0.15
 
 SYNOPSIS
         no autovivification;
@@ -189,7 +189,7 @@ ACKNOWLEDGEMENTS
     Matt S. Trout asked for it.
 
 COPYRIGHT & LICENSE
-    Copyright 2009,2010,2011,2012,2013,2014 Vincent Pit, all rights
+    Copyright 2009,2010,2011,2012,2013,2014,2015 Vincent Pit, all rights
     reserved.
 
     This program is free software; you can redistribute it and/or modify it
