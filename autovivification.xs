@@ -160,7 +160,8 @@ static I32 a_loaded = 0;
 #if A_THREADSAFE
 
 #define PTABLE_NAME        ptable_loaded
-#define PTABLE_VAL_FREE(V) NOOP
+#define PTABLE_NEED_DELETE 1
+#define PTABLE_NEED_WALK   0
 
 #include "ptable.h"
 
@@ -241,6 +242,8 @@ typedef struct {
 
 #define PTABLE_NAME        ptable_hints
 #define PTABLE_VAL_FREE(V) A_HINT_FREE(V)
+#define PTABLE_NEED_DELETE 0
+#define PTABLE_NEED_WALK   1
 
 #define pPTBL  pTHX
 #define pPTBL_ pTHX_
@@ -257,7 +260,8 @@ typedef struct {
 #endif /* A_WORKAROUND_REQUIRE_PROPAGATION */
 
 #define PTABLE_NAME        ptable_seen
-#define PTABLE_VAL_FREE(V) NOOP
+#define PTABLE_NEED_DELETE 0
+#define PTABLE_NEED_WALK   0
 
 #include "ptable.h"
 
@@ -479,6 +483,8 @@ typedef struct {
 
 #define PTABLE_NAME        ptable_map
 #define PTABLE_VAL_FREE(V) PerlMemShared_free(V)
+#define PTABLE_NEED_DELETE 1
+#define PTABLE_NEED_WALK   0
 
 #include "ptable.h"
 

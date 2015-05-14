@@ -52,10 +52,6 @@
 # define PTABLE_NAME ptable
 #endif
 
-#ifndef PTABLE_VAL_FREE
-# define PTABLE_VAL_FREE(V)
-#endif
-
 #ifndef PTABLE_JOIN
 # define PTABLE_PASTE(A, B) A ## B
 # define PTABLE_JOIN(A, B)  PTABLE_PASTE(A, B)
@@ -63,6 +59,14 @@
 
 #ifndef PTABLE_PREFIX
 # define PTABLE_PREFIX(X) PTABLE_JOIN(PTABLE_NAME, X)
+#endif
+
+#ifndef PTABLE_NEED_DELETE
+# define PTABLE_NEED_DELETE 1
+#endif
+
+#ifndef PTABLE_NEED_WALK
+# define PTABLE_NEED_WALK 1
 #endif
 
 #ifndef ptable_ent
@@ -84,7 +88,7 @@ typedef struct ptable {
 #endif /* !ptable */
 
 #ifndef ptable_new
-STATIC ptable *ptable_new(pPTBLMS) {
+static ptable *ptable_new(pPTBLMS) {
 #define ptable_new() ptable_new(aPTBLMS)
  ptable *t = VOID2(ptable *, PerlMemShared_malloc(sizeof *t));
  t->max    = 63;
@@ -101,7 +105,7 @@ STATIC ptable *ptable_new(pPTBLMS) {
 #endif
 
 #ifndef ptable_find
-STATIC ptable_ent *ptable_find(const ptable * const t, const void * const key) {
+static ptable_ent *ptable_find(const ptable * const t, const void * const key) {
 #define ptable_find ptable_find
  ptable_ent *ent;
  const UV hash = PTABLE_HASH(key);
@@ -117,7 +121,7 @@ STATIC ptable_ent *ptable_find(const ptable * const t, const void * const key) {
 #endif /* !ptable_find */
 
 #ifndef ptable_fetch
-STATIC void *ptable_fetch(const ptable * const t, const void * const key) {
+static void *ptable_fetch(const ptable * const t, const void * const key) {
 #define ptable_fetch ptable_fetch
  const ptable_ent *const ent = ptable_find(t, key);
 
@@ -126,7 +130,7 @@ STATIC void *ptable_fetch(const ptable * const t, const void * const key) {
 #endif /* !ptable_fetch */
 
 #ifndef ptable_split
-STATIC void ptable_split(pPTBLMS_ ptable * const t) {
+static void ptable_split(pPTBLMS_ ptable * const t) {
 #define ptable_split(T) ptable_split(aPTBLMS_ (T))
  ptable_ent **ary = t->ary;
  const size_t oldsize = t->max + 1;
@@ -156,12 +160,14 @@ STATIC void ptable_split(pPTBLMS_ ptable * const t) {
 }
 #endif /* !ptable_split */
 
-STATIC void PTABLE_PREFIX(_store)(pPTBL_ ptable * const t, const void * const key, void * const val) {
+static void PTABLE_PREFIX(_store)(pPTBL_ ptable * const t, const void * const key, void * const val) {
  ptable_ent *ent = ptable_find(t, key);
 
  if (ent) {
+#ifdef PTABLE_VAL_FREE
   void *oldval = ent->val;
   PTABLE_VAL_FREE(oldval);
+#endif
   ent->val = val;
  } else if (val) {
   const size_t i = PTABLE_HASH(key) & t->max;
@@ -176,7 +182,9 @@ STATIC void PTABLE_PREFIX(_store)(pPTBL_ ptable * const t, const void * const ke
  }
 }
 
-STATIC void PTABLE_PREFIX(_delete)(pPTBL_ ptable * const t, const void * const key) {
+#if PTABLE_NEED_DELETE
+
+static void PTABLE_PREFIX(_delete)(pPTBL_ ptable * const t, const void * const key) {
  ptable_ent *prev, *ent;
  const size_t i = PTABLE_HASH(key) & t->max;
 
@@ -192,13 +200,18 @@ STATIC void PTABLE_PREFIX(_delete)(pPTBL_ ptable * const t, const void * const k
    prev->next = ent->next;
   else
    t->ary[i]  = ent->next;
+#ifdef PTABLE_VAL_FREE
   PTABLE_VAL_FREE(ent->val);
+#endif
   PerlMemShared_free(ent);
  }
 }
 
-#ifndef ptable_walk
-STATIC void ptable_walk(pTHX_ ptable * const t, void (*cb)(pTHX_ ptable_ent *ent, void *userdata), void *userdata) {
+#endif /* PTABLE_NEED_DELETE */
+
+#if PTABLE_NEED_WALK && !defined(ptable_walk)
+
+static void ptable_walk(pTHX_ ptable * const t, void (*cb)(pTHX_ ptable_ent *ent, void *userdata), void *userdata) {
 #define ptable_walk(T, CB, UD) ptable_walk(aTHX_ (T), (CB), (UD))
  if (t && t->items) {
   register ptable_ent ** const array = t->ary;
@@ -211,9 +224,10 @@ STATIC void ptable_walk(pTHX_ ptable * const t, void (*cb)(pTHX_ ptable_ent *ent
   } while (i--);
  }
 }
-#endif /* !ptable_walk */
 
-STATIC void PTABLE_PREFIX(_clear)(pPTBL_ ptable * const t) {
+#endif /* PTABLE_NEED_WALK && !defined(ptable_walk) */
+
+static void PTABLE_PREFIX(_clear)(pPTBL_ ptable * const t) {
  if (t && t->items) {
   register ptable_ent ** const array = t->ary;
   size_t i = t->max;
@@ -221,11 +235,12 @@ STATIC void PTABLE_PREFIX(_clear)(pPTBL_ ptable * const t) {
   do {
    ptable_ent *entry = array[i];
    while (entry) {
-    ptable_ent * const oentry = entry;
-    void *val = oentry->val;
-    entry = entry->next;
-    PTABLE_VAL_FREE(val);
-    PerlMemShared_free(oentry);
+    ptable_ent * const nentry = entry->next;
+#ifdef PTABLE_VAL_FREE
+    PTABLE_VAL_FREE(entry->val);
+#endif
+    PerlMemShared_free(entry);
+    entry = nentry;
    }
    array[i] = NULL;
   } while (i--);
@@ -234,7 +249,7 @@ STATIC void PTABLE_PREFIX(_clear)(pPTBL_ ptable * const t) {
  }
 }
 
-STATIC void PTABLE_PREFIX(_free)(pPTBL_ ptable * const t) {
+static void PTABLE_PREFIX(_free)(pPTBL_ ptable * const t) {
  if (!t)
   return;
  PTABLE_PREFIX(_clear)(aPTBL_ t);
@@ -249,3 +264,6 @@ STATIC void PTABLE_PREFIX(_free)(pPTBL_ ptable * const t) {
 
 #undef PTABLE_NAME
 #undef PTABLE_VAL_FREE
+
+#undef PTABLE_NEED_DELETE
+#undef PTABLE_NEED_WALK
