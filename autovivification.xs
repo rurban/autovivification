@@ -491,6 +491,7 @@ typedef struct {
 /* PerlMemShared_free() needs the [ap]PTBLMS_? default values */
 #define ptable_map_store(T, K, V) ptable_map_store(aPTBLMS_ (T), (K), (V))
 #define ptable_map_delete(T, K)   ptable_map_delete(aPTBLMS_ (T), (K))
+#define ptable_map_free(T)        ptable_map_free(aPTBLMS_ (T))
 
 static ptable *a_op_map = NULL;
 
