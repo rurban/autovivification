@@ -1570,6 +1570,10 @@ static void a_teardown(pTHX_ void *root) {
 
   ptable_map_free(a_op_map);
   a_op_map = NULL;
+
+#ifdef USE_ITHREADS
+  MUTEX_DESTROY(&a_op_map_mutex);
+#endif
  }
 
  A_LOADED_UNLOCK;
@@ -1604,6 +1608,7 @@ static void a_setup(pTHX) {
   PERL_HASH(a_hash, __PACKAGE__, __PACKAGE_LEN__);
 
   a_op_map = ptable_new();
+
 #ifdef USE_ITHREADS
   MUTEX_INIT(&a_op_map_mutex);
 #endif
