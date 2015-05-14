@@ -10,6 +10,7 @@ ptable.h
 samples/bench.pl
 samples/hash2array.pl
 t/00-load.t
+t/09-load-threads.t
 t/20-hash.t
 t/22-hash-kv.t
 t/23-hash-tied.t

@@ -92,12 +92,33 @@
 # define MY_CXT_CLONE NOOP
 #endif
 
+#if A_THREADSAFE
+/* We must use preexistent global mutexes or we will never be able to destroy
+ * them. */
+# if A_HAS_PERL(5, 9, 3)
+#  define A_LOADED_LOCK   MUTEX_LOCK(&PL_my_ctx_mutex)
+#  define A_LOADED_UNLOCK MUTEX_UNLOCK(&PL_my_ctx_mutex)
+# else
+#  define A_LOADED_LOCK   OP_REFCNT_LOCK
+#  define A_LOADED_UNLOCK OP_REFCNT_UNLOCK
+# endif
+#else
+# define A_LOADED_LOCK   NOOP
+# define A_LOADED_UNLOCK NOOP
+#endif
+
 #if defined(OP_CHECK_MUTEX_LOCK) && defined(OP_CHECK_MUTEX_UNLOCK)
 # define A_CHECK_LOCK   OP_CHECK_MUTEX_LOCK
 # define A_CHECK_UNLOCK OP_CHECK_MUTEX_UNLOCK
-#else
+#elif A_HAS_PERL(5, 9, 3)
 # define A_CHECK_LOCK   OP_REFCNT_LOCK
 # define A_CHECK_UNLOCK OP_REFCNT_UNLOCK
+#else
+/* Before perl 5.9.3, indirect_ck_*() calls are already protected by the
+ * A_LOADED mutex, which falls back to the OP_REFCNT mutex. Make sure we don't
+ * lock it twice. */
+# define A_CHECK_LOCK   NOOP
+# define A_CHECK_UNLOCK NOOP
 #endif
 
 typedef OP *(*a_ck_t)(pTHX_ OP *);
@@ -131,6 +152,79 @@ static void a_ck_restore(pTHX_ OPCODE type, a_ck_t *old_ck_p) {
 }
 
 /* --- Helpers ------------------------------------------------------------- */
+
+/* ... Check if the module is loaded ....................................... */
+
+static I32 a_loaded = 0;
+
+#if A_THREADSAFE
+
+#define PTABLE_NAME        ptable_loaded
+#define PTABLE_VAL_FREE(V) NOOP
+
+#include "ptable.h"
+
+#define ptable_loaded_store(T, K, V) ptable_loaded_store(aPTBLMS_ (T), (K), (V))
+#define ptable_loaded_delete(T, K)   ptable_loaded_delete(aPTBLMS_ (T), (K))
+#define ptable_loaded_free(T)        ptable_loaded_free(aPTBLMS_ (T))
+
+static ptable *a_loaded_cxts = NULL;
+
+static int a_is_loaded(pTHX_ void *cxt) {
+#define a_is_loaded(C) a_is_loaded(aTHX_ (C))
+ int res = 0;
+
+ A_LOADED_LOCK;
+ if (a_loaded_cxts && ptable_fetch(a_loaded_cxts, cxt))
+  res = 1;
+ A_LOADED_UNLOCK;
+
+ return res;
+}
+
+static int a_set_loaded_locked(pTHX_ void *cxt) {
+#define a_set_loaded_locked(C) a_set_loaded_locked(aTHX_ (C))
+ int global_setup = 0;
+
+ if (a_loaded <= 0) {
+  assert(a_loaded == 0);
+  assert(!a_loaded_cxts);
+  a_loaded_cxts = ptable_new();
+  global_setup  = 1;
+ }
+ ++a_loaded;
+ assert(a_loaded_cxts);
+ ptable_loaded_store(a_loaded_cxts, cxt, cxt);
+
+ return global_setup;
+}
+
+static int a_clear_loaded_locked(pTHX_ void *cxt) {
+#define a_clear_loaded_locked(C) a_clear_loaded_locked(aTHX_ (C))
+ int global_teardown = 0;
+
+ if (a_loaded > 1) {
+  assert(a_loaded_cxts);
+  ptable_loaded_delete(a_loaded_cxts, cxt);
+  --a_loaded;
+ } else if (a_loaded_cxts) {
+  assert(a_loaded == 1);
+  ptable_loaded_free(a_loaded_cxts);
+  a_loaded_cxts   = NULL;
+  a_loaded        = 0;
+  global_teardown = 1;
+ }
+
+ return global_teardown;
+}
+
+#else
+
+#define a_is_loaded(C)           (a_loaded > 0)
+#define a_set_loaded_locked(C)   ((a_loaded++ <= 0) ? 1 : 0)
+#define a_clear_loaded_locked(C) ((--a_loaded <= 0) ? 1 : 0)
+
+#endif
 
 /* ... Thread-safe hints ................................................... */
 
@@ -175,18 +269,19 @@ typedef struct {
 #define MY_CXT_KEY __PACKAGE__ "::_guts" XS_VERSION
 
 typedef struct {
+ peep_t  old_peep; /* This is actually the rpeep past 5.13.5 */
+ ptable *seen;     /* It really is a ptable_seen */
 #if A_THREADSAFE && A_WORKAROUND_REQUIRE_PROPAGATION
- ptable *tbl;   /* It really is a ptable_hints */
+ ptable *tbl;      /* It really is a ptable_hints */
  tTHX    owner;
 #endif /* A_THREADSAFE && A_WORKAROUND_REQUIRE_PROPAGATION */
- ptable *seen;  /* It really is a ptable_seen */
 } my_cxt_t;
 
 START_MY_CXT
 
-#if A_THREADSAFE
-
 #if A_WORKAROUND_REQUIRE_PROPAGATION
+
+#if A_THREADSAFE
 
 typedef struct {
  ptable       *tbl;
@@ -225,45 +320,7 @@ static void a_ptable_clone(pTHX_ ptable_ent *ent, void *ud_) {
  ptable_hints_store(ud->tbl, ent->key, h2);
 }
 
-#endif /* A_WORKAROUND_REQUIRE_PROPAGATION */
-
-static void a_thread_cleanup(pTHX_ void *ud) {
- dMY_CXT;
-
-#if A_WORKAROUND_REQUIRE_PROPAGATION
- ptable_hints_free(MY_CXT.tbl);
- MY_CXT.tbl  = NULL;
-#endif /* A_WORKAROUND_REQUIRE_PROPAGATION */
- ptable_seen_free(MY_CXT.seen);
- MY_CXT.seen = NULL;
-}
-
-static int a_endav_free(pTHX_ SV *sv, MAGIC *mg) {
- SAVEDESTRUCTOR_X(a_thread_cleanup, NULL);
-
- return 0;
-}
-
-static MGVTBL a_endav_vtbl = {
- 0,
- 0,
- 0,
- 0,
- a_endav_free
-#if MGf_COPY
- , 0
-#endif
-#if MGf_DUP
- , 0
-#endif
-#if MGf_LOCAL
- , 0
-#endif
-};
-
 #endif /* A_THREADSAFE */
-
-#if A_WORKAROUND_REQUIRE_PROPAGATION
 
 static IV a_require_tag(pTHX) {
 #define a_require_tag() a_require_tag(aTHX)
@@ -390,7 +447,7 @@ static UV a_detag(pTHX_ const SV *hint) {
 #define A_HINT_ROOT   64
 #define A_HINT_DEREF  128
 
-static U32 a_hash = 0;
+static VOL U32 a_hash = 0;
 
 static UV a_hint(pTHX) {
 #define a_hint() a_hint(aTHX)
@@ -1335,8 +1392,6 @@ static OP *a_ck_root(pTHX_ OP *o) {
 
 /* ... Our peephole optimizer .............................................. */
 
-static peep_t a_old_peep = 0; /* This is actually the rpeep past 5.13.5 */
-
 static void a_peep_rec(pTHX_ OP *o, ptable *seen);
 
 static void a_peep_rec(pTHX_ OP *o, ptable *seen) {
@@ -1460,11 +1515,14 @@ static void a_peep_rec(pTHX_ OP *o, ptable *seen) {
 }
 
 static void a_peep(pTHX_ OP *o) {
+ ptable *seen;
  dMY_CXT;
- ptable *seen = MY_CXT.seen;
 
- a_old_peep(aTHX_ o);
+ assert(a_is_loaded(&MY_CXT));
 
+ MY_CXT.old_peep(aTHX_ o);
+
+ seen = MY_CXT.seen;
  if (seen) {
   ptable_seen_clear(seen);
   a_peep_rec(o);
@@ -1472,126 +1530,95 @@ static void a_peep(pTHX_ OP *o) {
  }
 }
 
-/* --- Interpreter setup/teardown ------------------------------------------ */
-
-static U32 a_initialized = 0;
+/* --- Module setup/teardown ----------------------------------------------- */
 
 static void a_teardown(pTHX_ void *root) {
+ dMY_CXT;
 
- if (!a_initialized)
-  return;
+ A_LOADED_LOCK;
 
-#if A_MULTIPLICITY
- if (aTHX != root)
-  return;
-#endif
+ if (a_clear_loaded_locked(&MY_CXT)) {
+  a_ck_restore(OP_PADANY, &a_old_ck_padany);
+  a_ck_restore(OP_PADSV,  &a_old_ck_padsv);
 
- {
-  dMY_CXT;
-# if A_THREADSAFE && A_WORKAROUND_REQUIRE_PROPAGATION
-  ptable_hints_free(MY_CXT.tbl);
-  MY_CXT.tbl  = NULL;
-# endif /* A_THREADSAFE && A_WORKAROUND_REQUIRE_PROPAGATION */
-  ptable_seen_free(MY_CXT.seen);
-  MY_CXT.seen = NULL;
+  a_ck_restore(OP_AELEM,  &a_old_ck_aelem);
+  a_ck_restore(OP_HELEM,  &a_old_ck_helem);
+  a_ck_restore(OP_RV2SV,  &a_old_ck_rv2sv);
+
+  a_ck_restore(OP_RV2AV,  &a_old_ck_rv2av);
+  a_ck_restore(OP_RV2HV,  &a_old_ck_rv2hv);
+
+  a_ck_restore(OP_ASLICE, &a_old_ck_aslice);
+  a_ck_restore(OP_HSLICE, &a_old_ck_hslice);
+
+  a_ck_restore(OP_EXISTS, &a_old_ck_exists);
+  a_ck_restore(OP_DELETE, &a_old_ck_delete);
+  a_ck_restore(OP_KEYS,   &a_old_ck_keys);
+  a_ck_restore(OP_VALUES, &a_old_ck_values);
+
+  ptable_map_free(a_op_map);
+  a_op_map = NULL;
  }
 
- a_ck_restore(OP_PADANY, &a_old_ck_padany);
- a_ck_restore(OP_PADSV,  &a_old_ck_padsv);
+ A_LOADED_UNLOCK;
 
- a_ck_restore(OP_AELEM,  &a_old_ck_aelem);
- a_ck_restore(OP_HELEM,  &a_old_ck_helem);
- a_ck_restore(OP_RV2SV,  &a_old_ck_rv2sv);
-
- a_ck_restore(OP_RV2AV,  &a_old_ck_rv2av);
- a_ck_restore(OP_RV2HV,  &a_old_ck_rv2hv);
-
- a_ck_restore(OP_ASLICE, &a_old_ck_aslice);
- a_ck_restore(OP_HSLICE, &a_old_ck_hslice);
-
- a_ck_restore(OP_EXISTS, &a_old_ck_exists);
- a_ck_restore(OP_DELETE, &a_old_ck_delete);
- a_ck_restore(OP_KEYS,   &a_old_ck_keys);
- a_ck_restore(OP_VALUES, &a_old_ck_values);
-
+ if (MY_CXT.old_peep) {
 #if A_HAS_RPEEP
- PL_rpeepp  = a_old_peep;
+  PL_rpeepp = MY_CXT.old_peep;
 #else
- PL_peepp   = a_old_peep;
+  PL_peepp  = MY_CXT.old_peep;
 #endif
- a_old_peep = 0;
+  MY_CXT.old_peep = 0;
+ }
 
- a_initialized = 0;
+ ptable_seen_free(MY_CXT.seen);
+ MY_CXT.seen = NULL;
+
+#if A_THREADSAFE && A_WORKAROUND_REQUIRE_PROPAGATION
+ ptable_hints_free(MY_CXT.tbl);
+ MY_CXT.tbl  = NULL;
+#endif /* A_THREADSAFE && A_WORKAROUND_REQUIRE_PROPAGATION */
+
+ return;
 }
 
 static void a_setup(pTHX) {
 #define a_setup() a_setup(aTHX)
- if (a_initialized)
-  return;
+ MY_CXT_INIT; /* Takes/release PL_my_ctx_mutex */
 
- {
-  MY_CXT_INIT;
-# if A_THREADSAFE && A_WORKAROUND_REQUIRE_PROPAGATION
-  MY_CXT.tbl   = ptable_new();
-  MY_CXT.owner = aTHX;
-# endif /* A_THREADSAFE && A_WORKAROUND_REQUIRE_PROPAGATION */
-  MY_CXT.seen  = ptable_new();
- }
+ A_LOADED_LOCK;
 
- a_ck_replace(OP_PADANY, a_ck_padany, &a_old_ck_padany);
- a_ck_replace(OP_PADSV,  a_ck_padsv,  &a_old_ck_padsv);
-
- a_ck_replace(OP_AELEM,  a_ck_deref,  &a_old_ck_aelem);
- a_ck_replace(OP_HELEM,  a_ck_deref,  &a_old_ck_helem);
- a_ck_replace(OP_RV2SV,  a_ck_deref,  &a_old_ck_rv2sv);
-
- a_ck_replace(OP_RV2AV,  a_ck_rv2xv,  &a_old_ck_rv2av);
- a_ck_replace(OP_RV2HV,  a_ck_rv2xv,  &a_old_ck_rv2hv);
-
- a_ck_replace(OP_ASLICE, a_ck_xslice, &a_old_ck_aslice);
- a_ck_replace(OP_HSLICE, a_ck_xslice, &a_old_ck_hslice);
-
- a_ck_replace(OP_EXISTS, a_ck_root,   &a_old_ck_exists);
- a_ck_replace(OP_DELETE, a_ck_root,   &a_old_ck_delete);
- a_ck_replace(OP_KEYS,   a_ck_root,   &a_old_ck_keys);
- a_ck_replace(OP_VALUES, a_ck_root,   &a_old_ck_values);
-
-#if A_HAS_RPEEP
- a_old_peep = PL_rpeepp;
- PL_rpeepp  = a_peep;
-#else
- a_old_peep = PL_peepp;
- PL_peepp   = a_peep;
-#endif
-
-#if A_MULTIPLICITY
- call_atexit(a_teardown, aTHX);
-#else
- call_atexit(a_teardown, NULL);
-#endif
-
- a_initialized = 1;
-}
-
-static U32 a_booted = 0;
-
-/* --- XS ------------------------------------------------------------------ */
-
-MODULE = autovivification      PACKAGE = autovivification
-
-PROTOTYPES: ENABLE
-
-BOOT:
-{
- if (!a_booted++) {
-  HV *stash;
+ if (a_set_loaded_locked(&MY_CXT)) {
+  PERL_HASH(a_hash, __PACKAGE__, __PACKAGE_LEN__);
 
   a_op_map = ptable_new();
 #ifdef USE_ITHREADS
   MUTEX_INIT(&a_op_map_mutex);
 #endif
 
-  PERL_HASH(a_hash, __PACKAGE__, __PACKAGE_LEN__);
+  a_ck_replace(OP_PADANY, a_ck_padany, &a_old_ck_padany);
+  a_ck_replace(OP_PADSV,  a_ck_padsv,  &a_old_ck_padsv);
+
+  a_ck_replace(OP_AELEM,  a_ck_deref,  &a_old_ck_aelem);
+  a_ck_replace(OP_HELEM,  a_ck_deref,  &a_old_ck_helem);
+  a_ck_replace(OP_RV2SV,  a_ck_deref,  &a_old_ck_rv2sv);
+
+  a_ck_replace(OP_RV2AV,  a_ck_rv2xv,  &a_old_ck_rv2av);
+  a_ck_replace(OP_RV2HV,  a_ck_rv2xv,  &a_old_ck_rv2hv);
+
+  a_ck_replace(OP_ASLICE, a_ck_xslice, &a_old_ck_aslice);
+  a_ck_replace(OP_HSLICE, a_ck_xslice, &a_old_ck_hslice);
+
+  a_ck_replace(OP_EXISTS, a_ck_root,   &a_old_ck_exists);
+  a_ck_replace(OP_DELETE, a_ck_root,   &a_old_ck_delete);
+  a_ck_replace(OP_KEYS,   a_ck_root,   &a_old_ck_keys);
+  a_ck_replace(OP_VALUES, a_ck_root,   &a_old_ck_values);
+ }
+
+ A_LOADED_UNLOCK;
+
+ {
+  HV *stash;
 
   stash = gv_stashpvn(__PACKAGE__, __PACKAGE_LEN__, 1);
   newCONSTSUB(stash, "A_HINT_STRICT", newSVuv(A_HINT_STRICT));
@@ -1605,6 +1632,41 @@ BOOT:
   newCONSTSUB(stash, "A_FORKSAFE",    newSVuv(A_FORKSAFE));
  }
 
+#if A_HAS_RPEEP
+ if (PL_rpeepp != a_peep) {
+  MY_CXT.old_peep = PL_rpeepp;
+  PL_rpeepp       = a_peep;
+ }
+#else
+ if (PL_peepp != a_peep) {
+  MY_CXT.old_peep = PL_peepp;
+  PL_peepp        = a_peep;
+ }
+#endif
+ else {
+  MY_CXT.old_peep = 0;
+ }
+
+ MY_CXT.seen = ptable_new();
+
+#if A_THREADSAFE && A_WORKAROUND_REQUIRE_PROPAGATION
+ MY_CXT.tbl   = ptable_new();
+ MY_CXT.owner = aTHX;
+#endif /* A_THREADSAFE && A_WORKAROUND_REQUIRE_PROPAGATION */
+
+ call_atexit(a_teardown, NULL);
+
+ return;
+}
+
+/* --- XS ------------------------------------------------------------------ */
+
+MODULE = autovivification      PACKAGE = autovivification
+
+PROTOTYPES: ENABLE
+
+BOOT:
+{
  a_setup();
 }
 
@@ -1617,48 +1679,32 @@ PREINIT:
 #if A_WORKAROUND_REQUIRE_PROPAGATION
  ptable *t;
 #endif
- ptable *s;
- GV     *gv;
 PPCODE:
- {
 #if A_WORKAROUND_REQUIRE_PROPAGATION
+ {
+  a_ptable_clone_ud ud;
   dMY_CXT;
-  {
-   a_ptable_clone_ud ud;
-
-   t = ptable_new();
-   a_ptable_clone_ud_init(ud, t, MY_CXT.owner);
-   ptable_walk(MY_CXT.tbl, a_ptable_clone, &ud);
-   a_ptable_clone_ud_deinit(ud);
-  }
-#endif
-  s = ptable_new();
+  t = ptable_new();
+  a_ptable_clone_ud_init(ud, t, MY_CXT.owner);
+  ptable_walk(MY_CXT.tbl, a_ptable_clone, &ud);
+  a_ptable_clone_ud_deinit(ud);
  }
+#endif
  {
   MY_CXT_CLONE;
 #if A_WORKAROUND_REQUIRE_PROPAGATION
   MY_CXT.tbl   = t;
   MY_CXT.owner = aTHX;
 #endif
-  MY_CXT.seen  = s;
+  MY_CXT.seen  = ptable_new();
+  {
+   int global_setup;
+   A_LOADED_LOCK;
+   global_setup = a_set_loaded_locked(&MY_CXT);
+   assert(!global_setup);
+   A_LOADED_UNLOCK;
+  }
  }
- gv = gv_fetchpv(__PACKAGE__ "::_THREAD_CLEANUP", 0, SVt_PVCV);
- if (gv) {
-  CV *cv = GvCV(gv);
-  if (!PL_endav)
-   PL_endav = newAV();
-  SvREFCNT_inc(cv);
-  if (!av_store(PL_endav, av_len(PL_endav) + 1, (SV *) cv))
-   SvREFCNT_dec(cv);
-  sv_magicext((SV *) PL_endav, NULL, PERL_MAGIC_ext, &a_endav_vtbl, NULL, 0);
- }
- XSRETURN(0);
-
-void
-_THREAD_CLEANUP(...)
-PROTOTYPE: DISABLE
-PPCODE:
- a_thread_cleanup(aTHX_ NULL);
  XSRETURN(0);
 
 #endif /* A_THREADSAFE */
