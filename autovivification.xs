@@ -1258,14 +1258,19 @@ static OP *a_ck_deref(pTHX_ OP *o) {
  }
  o = old_ck(aTHX_ o);
 
- if (hint & A_HINT_DO) {
 #if A_HAS_MULTIDEREF
-  if (old_ck == a_old_ck_rv2sv && o->op_flags & OPf_KIDS) {
-   OP *kid = cUNOPo->op_first;
-   if (kid && kid->op_type == OP_GV)
+ if (old_ck == a_old_ck_rv2sv && o->op_flags & OPf_KIDS) {
+  OP *kid = cUNOPo->op_first;
+  if (kid && kid->op_type == OP_GV) {
+   if (hint & A_HINT_DO)
     a_map_store(kid, kid->op_ppaddr, NULL, hint);
+   else
+    a_map_delete(kid);
   }
+ }
 #endif
+
+ if (hint & A_HINT_DO) {
   a_map_store_root(o, o->op_ppaddr, hint);
   o->op_ppaddr = a_pp_deref;
  } else
