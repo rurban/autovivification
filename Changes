@@ -1,5 +1,8 @@
 Revision history for autovivification
 
+0.16    2015-07-01 14:30 UTC
+        + Fix : Broken linkage on Windows.
+
 0.15    2015-05-14 20:35 UTC
         + Chg : The new environment variable to enable thread tests on older
                 perls is PERL_FORCE_TEST_THREADS. Note that this variable

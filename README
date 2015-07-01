@@ -2,7 +2,7 @@ NAME
     autovivification - Lexically disable autovivification.
 
 VERSION
-    Version 0.15
+    Version 0.16
 
 SYNOPSIS
         no autovivification;
