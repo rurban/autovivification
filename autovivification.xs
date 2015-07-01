@@ -1178,7 +1178,7 @@ do_HV_helem:
         break;
        case A_HINT_STORE:
         sv = a_do_pp_hfetch_lv(sv, key);
-	break;
+        break;
        case A_HINT_EXISTS:
         sv = a_do_pp_hexists(sv, key);
         break;
