@@ -41,6 +41,49 @@
 # endif
 #endif
 
+/* ... Our vivify_ref() .................................................... */
+
+/* Perl_vivify_ref() is not exported, so we have to reimplement it. */
+
+#if A_HAS_MULTIDEREF
+
+static SV *a_vivify_ref(pTHX_ SV *sv, int to_hash) {
+#define a_vivify_ref(S, TH) a_vivify_ref(aTHX_ (S), (TH))
+ SvGETMAGIC(sv);
+
+ if (!SvOK(sv)) {
+  SV *val;
+
+  if (SvREADONLY(sv))
+   Perl_croak_no_modify();
+
+  /* Inlined prepare_SV_for_RV() */
+  if (SvTYPE(sv) < SVt_PV && SvTYPE(sv) != SVt_IV) {
+   sv_upgrade(sv, SVt_IV);
+  } else if (SvTYPE(sv) >= SVt_PV) {
+   SvPV_free(sv);
+   SvLEN_set(sv, 0);
+   SvCUR_set(sv, 0);
+  }
+
+  val = to_hash ? MUTABLE_SV(newHV()) : MUTABLE_SV(newAV());
+  SvRV_set(sv, val);
+  SvROK_on(sv);
+  SvSETMAGIC(sv);
+  SvGETMAGIC(sv);
+ }
+
+ if (SvGMAGICAL(sv)) {
+  SV *msv = sv_newmortal();
+  sv_setsv_nomg(msv, sv);
+  return msv;
+ }
+
+ return sv;
+}
+
+#endif /* A_HAS_MULTIDEREF */
+
 /* ... Thread safety and multiplicity ...................................... */
 
 /* Always safe when the workaround isn't needed */
@@ -1026,7 +1069,7 @@ static OP *a_pp_multideref(pTHX) {
     if (a_undef(sv))
      goto ret_undef;
 do_AV_vivify_rv2av_aelem:
-    sv = Perl_vivify_ref(aTHX_ sv, OPpDEREF_AV);
+    sv = a_vivify_ref(sv, 0);
 do_AV_rv2av_aelem:
     sv = a_do_pp_rv2av(sv);
 do_AV_aelem:
@@ -1105,7 +1148,7 @@ check_elem:
     if (a_undef(sv))
      goto ret_undef;
 do_HV_vivify_rv2hv_helem:
-    sv = Perl_vivify_ref(aTHX_ sv, OPpDEREF_HV);
+    sv = a_vivify_ref(sv, 1);
 do_HV_rv2hv_helem:
     sv = a_do_pp_rv2hv(sv);
 do_HV_helem:
