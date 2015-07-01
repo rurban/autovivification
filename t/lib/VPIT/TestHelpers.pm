@@ -680,7 +680,7 @@ where :
 
 =item -
 
-C<@impls> is the list of desired implementations (which may be C<'Time::HiRes'> or C<'sleep'>), in the order they should be checked.
+C<@impls> is the list of desired implementations (which may be C<'Time::HiRes'>, C<'select'> or C<'sleep'>), in the order they should be checked.
 When the list is empty, it defaults to all of them.
 
 =back
