@@ -157,9 +157,9 @@ static SV *a_vivify_ref(pTHX_ SV *sv, int to_hash) {
 # define A_CHECK_LOCK   OP_REFCNT_LOCK
 # define A_CHECK_UNLOCK OP_REFCNT_UNLOCK
 #else
-/* Before perl 5.9.3, indirect_ck_*() calls are already protected by the
- * A_LOADED mutex, which falls back to the OP_REFCNT mutex. Make sure we don't
- * lock it twice. */
+/* Before perl 5.9.3, a_ck_*() calls are already protected by the A_LOADED
+ * mutex, which falls back to the OP_REFCNT mutex. Make sure we don't lock it
+ * twice. */
 # define A_CHECK_LOCK   NOOP
 # define A_CHECK_UNLOCK NOOP
 #endif
