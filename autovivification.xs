@@ -41,6 +41,12 @@
 # endif
 #endif
 
+#ifdef DEBUGGING
+# define A_ASSERT(C) assert(C)
+#else
+# define A_ASSERT(C)
+#endif
+
 /* ... Our vivify_ref() .................................................... */
 
 /* Perl_vivify_ref() is not exported, so we have to reimplement it. */
@@ -231,13 +237,13 @@ static int a_set_loaded_locked(pTHX_ void *cxt) {
  int global_setup = 0;
 
  if (a_loaded <= 0) {
-  assert(a_loaded == 0);
-  assert(!a_loaded_cxts);
+  A_ASSERT(a_loaded == 0);
+  A_ASSERT(!a_loaded_cxts);
   a_loaded_cxts = ptable_new();
   global_setup  = 1;
  }
  ++a_loaded;
- assert(a_loaded_cxts);
+ A_ASSERT(a_loaded_cxts);
  ptable_loaded_store(a_loaded_cxts, cxt, cxt);
 
  return global_setup;
@@ -248,11 +254,11 @@ static int a_clear_loaded_locked(pTHX_ void *cxt) {
  int global_teardown = 0;
 
  if (a_loaded > 1) {
-  assert(a_loaded_cxts);
+  A_ASSERT(a_loaded_cxts);
   ptable_loaded_delete(a_loaded_cxts, cxt);
   --a_loaded;
  } else if (a_loaded_cxts) {
-  assert(a_loaded == 1);
+  A_ASSERT(a_loaded == 1);
   ptable_loaded_free(a_loaded_cxts);
   a_loaded_cxts   = NULL;
   a_loaded        = 0;
@@ -919,7 +925,7 @@ static OP *a_pp_root_binop(pTHX) {
 static UV a_do_multideref(const OP *o, UV flags) {
  UV isexdel, other_flags;
 
- assert(o->op_type == OP_MULTIDEREF);
+ A_ASSERT(o->op_type == OP_MULTIDEREF);
 
  other_flags = flags & ~A_HINT_DO;
 
@@ -1022,7 +1028,7 @@ static OP *a_pp_multideref(pTHX) {
  {
   dA_MAP_THX;
   const a_op_info *oi = a_map_fetch(PL_op);
-  assert(oi);
+  A_ASSERT(oi);
   flags = a_do_multideref(PL_op, oi->flags);
   if (!flags)
    return oi->old_pp(aTHX);
@@ -1045,7 +1051,7 @@ static OP *a_pp_multideref(pTHX) {
     goto do_AV_aelem;
    case MDEREF_AV_gvav_aelem: /* $pkg[...] */
     sv = UNOP_AUX_item_sv(++items);
-    assert(isGV_with_GP(sv));
+    A_ASSERT(isGV_with_GP(sv));
     sv = (SV *) GvAVn((GV *) sv);
     if (a_undef(sv))
      goto ret_undef;
@@ -1057,7 +1063,7 @@ static OP *a_pp_multideref(pTHX) {
     goto do_AV_rv2av_aelem;
    case MDEREF_AV_gvsv_vivify_rv2av_aelem: /* $pkg->[...] */
     sv = UNOP_AUX_item_sv(++items);
-    assert(isGV_with_GP(sv));
+    A_ASSERT(isGV_with_GP(sv));
     sv = GvSVn((GV *) sv);
     if (a_undef(sv))
      goto ret_undef;
@@ -1075,7 +1081,7 @@ do_AV_rv2av_aelem:
 do_AV_aelem:
     {
      SV *esv;
-     assert(SvTYPE(sv) == SVt_PVAV);
+     A_ASSERT(SvTYPE(sv) == SVt_PVAV);
      switch (actions & MDEREF_INDEX_MASK) {
       case MDEREF_INDEX_none:
        goto finish;
@@ -1087,7 +1093,7 @@ do_AV_aelem:
        goto check_elem;
       case MDEREF_INDEX_gvsv:
        esv = UNOP_AUX_item_sv(++items);
-       assert(isGV_with_GP(esv));
+       A_ASSERT(isGV_with_GP(esv));
        esv = GvSVn((GV *) esv);
 check_elem:
        if (UNLIKELY(SvROK(esv) && !SvGAMAGIC(esv) && ckWARN(WARN_MISC)))
@@ -1124,7 +1130,7 @@ check_elem:
     goto do_HV_helem;
    case MDEREF_HV_gvhv_helem: /* $pkg{...} */
     sv = UNOP_AUX_item_sv(++items);
-    assert(isGV_with_GP(sv));
+    A_ASSERT(isGV_with_GP(sv));
     sv = (SV *) GvHVn((GV *) sv);
     if (a_undef(sv))
      goto ret_undef;
@@ -1136,7 +1142,7 @@ check_elem:
     goto do_HV_rv2hv_helem;
    case MDEREF_HV_gvsv_vivify_rv2hv_helem: /* $pkg->{...} */
     sv = UNOP_AUX_item_sv(++items);
-    assert(isGV_with_GP(sv));
+    A_ASSERT(isGV_with_GP(sv));
     sv = GvSVn((GV *) sv);
     if (a_undef(sv))
      goto ret_undef;
@@ -1154,7 +1160,7 @@ do_HV_rv2hv_helem:
 do_HV_helem:
     {
      SV *key;
-     assert(SvTYPE(sv) == SVt_PVHV);
+     A_ASSERT(SvTYPE(sv) == SVt_PVHV);
      switch (actions & MDEREF_INDEX_MASK) {
       case MDEREF_INDEX_none:
        goto finish;
@@ -1166,7 +1172,7 @@ do_HV_helem:
        break;
       case MDEREF_INDEX_gvsv:
        key = UNOP_AUX_item_sv(++items);
-       assert(isGV_with_GP(key));
+       A_ASSERT(isGV_with_GP(key));
        key = GvSVn((GV *) key);
        break;
      }
@@ -1573,7 +1579,7 @@ static void a_peep(pTHX_ OP *o) {
  ptable *seen;
  dMY_CXT;
 
- assert(a_is_loaded(&MY_CXT));
+ A_ASSERT(a_is_loaded(&MY_CXT));
 
  MY_CXT.old_peep(aTHX_ o);
 
@@ -1761,7 +1767,7 @@ PPCODE:
    int global_setup;
    A_LOADED_LOCK;
    global_setup = a_set_loaded_locked(&MY_CXT);
-   assert(!global_setup);
+   A_ASSERT(!global_setup);
    A_LOADED_UNLOCK;
   }
  }
