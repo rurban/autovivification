@@ -238,8 +238,6 @@ You can find documentation for this module with the perldoc command.
 
     perldoc autovivification
 
-Tests code coverage report is available at L<http://www.profvince.com/perl/cover/autovivification>.
-
 =head1 ACKNOWLEDGEMENTS
 
 Matt S. Trout asked for it.
