@@ -39,12 +39,12 @@ print $is_gcc_34 ? "yes\n" : "no\n";
 
 # Threads, Windows and 5.8.x don't seem to be best friends
 if ($^O eq 'MSWin32' && "$]" < 5.009) {
- push @DEFINES, '-DA_MULTIPLICITY=0';
+ push @DEFINES, '-DXSH_MULTIPLICITY=0';
 }
 
 # Fork emulation got "fixed" in 5.10.1
 if ($^O eq 'MSWin32' && "$]" < 5.010_001) {
- push @DEFINES, '-DA_FORKSAFE=0';
+ push @DEFINES, '-DXSH_FORKSAFE=0';
 }
 
 @DEFINES = (DEFINE => join ' ', @DEFINES) if @DEFINES;
